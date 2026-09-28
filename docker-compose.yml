@@ -1,0 +1,103 @@
+services:
+  # PostgreSQL Database Service
+  postgres:
+    image: postgres:16-alpine
+    container_name: memora-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-memora}
+      POSTGRES_USER: ${DB_USERNAME:-memora_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret_memora_db_pass}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - memora-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-memora_user} -d ${DB_DATABASE:-memora}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Laravel 11 Backend API Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: memora-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      APP_NAME: Memora
+      APP_ENV: ${APP_ENV:-production}
+      APP_DEBUG: ${APP_DEBUG:-false}
+      APP_URL: ${APP_URL:-http://localhost:8000}
+      APP_KEY: ${APP_KEY:-base64:7K5vO0kP3mR8wX2yZ1qB6nC9jF4hL7sA5eT2uI4oV8w=}
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_DATABASE:-memora}
+      DB_USERNAME: ${DB_USERNAME:-memora_user}
+      DB_PASSWORD: ${DB_PASSWORD:-secret_memora_db_pass}
+      RUN_MIGRATIONS: "true"
+      SESSION_DRIVER: database
+      FILESYSTEM_DISK: ${FILESYSTEM_DISK:-public}
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend_storage:/var/www/html/storage
+    networks:
+      - memora-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/up"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # Next.js 14+ Frontend Service (Dev Mode with Live Hot Reloading)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: dev
+    container_name: memora-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      HOSTNAME: "0.0.0.0"
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api}
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "3000:3000"
+    networks:
+      - memora-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+
+networks:
+  memora-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  backend_storage:
+    driver: local

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <linearGradient id="memoraBadgeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f4623a"/>
+      <stop offset="100%" stop-color="#e44317"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded Squircle Badge -->
+  <rect width="100" height="100" rx="28" fill="url(#memoraBadgeGrad)"/>
+
+  <!-- Top Shutter Button -->
+  <rect x="29" y="19" width="13" height="4.5" rx="2.25" fill="#fffdf7"/>
+
+  <!-- Flash Sparkle -->
+  <path d="M 72 26 Q 72 32 78 32 Q 72 32 72 38 Q 72 32 66 32 Q 72 32 72 26 Z" fill="#fffdf7"/>
+
+  <!-- Camera Body / Viewfinder -->
+  <rect x="18" y="26" width="64" height="50" rx="15" stroke="#fffdf7" stroke-width="5"/>
+
+  <!-- Left Eye: Camera Lens with Catchlight -->
+  <circle cx="40" cy="46" r="9" stroke="#fffdf7" strokeWidth="4.5"/>
+  <circle cx="42.5" cy="43.5" r="2.5" fill="#fffdf7"/>
+
+  <!-- Right Eye: Joyful Candid Photobooth Wink -->
+  <path d="M 57 47 Q 64 39 71 47" stroke="#fffdf7" stroke-width="4.5" stroke-linecap="round"/>
+
+  <!-- Warm Human Smile -->
+  <path d="M 34 61 Q 50 72 66 61" stroke="#fffdf7" stroke-width="5" stroke-linecap="round"/>
+</svg>

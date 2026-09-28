@@ -1,0 +1,155 @@
+@import "tailwindcss";
+
+:root {
+  --radius: 1rem;
+  --background: oklch(98.3% 0.022 95);
+  --foreground: oklch(26.2% 0.031 48);
+  --cream: oklch(99.3% 0.012 95);
+  --card: oklch(99.3% 0.012 95);
+  --card-foreground: oklch(26.2% 0.031 48);
+  --popover: oklch(99.3% 0.012 95);
+  --popover-foreground: oklch(26.2% 0.031 48);
+  --primary: oklch(64.6% 0.203 35.5);
+  --primary-foreground: oklch(98.3% 0.022 95);
+  --secondary: oklch(95.5% 0.017 92);
+  --secondary-foreground: oklch(26.2% 0.031 48);
+  --muted: oklch(95.5% 0.017 92);
+  --muted-foreground: oklch(50.3% 0.033 52);
+  --accent: oklch(56.4% 0.157 246);
+  --accent-foreground: oklch(98.3% 0.022 95);
+  --destructive: oklch(57.7% 0.245 27.325);
+  --destructive-foreground: oklch(98.3% 0.022 95);
+  --border: oklch(26.2% 0.031 48 / 0.12);
+  --input: oklch(26.2% 0.031 48 / 0.14);
+  --ring: oklch(64.6% 0.203 35.5);
+}
+
+.dark {
+  --background: oklch(21% 0.022 48);
+  --foreground: oklch(98.3% 0.022 95);
+  --cream: oklch(26% 0.026 48);
+  --card: oklch(26% 0.026 48);
+  --card-foreground: oklch(98.3% 0.022 95);
+  --popover: oklch(26% 0.026 48);
+  --popover-foreground: oklch(98.3% 0.022 95);
+  --primary: oklch(68% 0.2 35.5);
+  --primary-foreground: oklch(21% 0.022 48);
+  --secondary: oklch(30% 0.026 48);
+  --secondary-foreground: oklch(98.3% 0.022 95);
+  --muted: oklch(30% 0.026 48);
+  --muted-foreground: oklch(75% 0.02 60);
+  --accent: oklch(62% 0.15 246);
+  --accent-foreground: oklch(98.3% 0.022 95);
+  --destructive: oklch(70.4% 0.191 22.216);
+  --destructive-foreground: oklch(98.3% 0.022 95);
+  --border: oklch(98.3% 0.022 95 / 0.12);
+  --input: oklch(98.3% 0.022 95 / 0.16);
+  --ring: oklch(68% 0.2 35.5);
+}
+
+@theme {
+  --font-display: 'Cormorant Garamond', Georgia, serif;
+  --font-serif: 'Cormorant Garamond', Georgia, serif;
+  --font-sans: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-cream: var(--cream);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+@layer base {
+  *, ::before, ::after {
+    box-sizing: border-box;
+    border-color: var(--border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Animations */
+@keyframes rise {
+  0% {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-strip {
+  0% {
+    opacity: 0;
+    transform: translateY(26px) rotate(6deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) rotate(6deg);
+  }
+}
+
+@keyframes tick {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes shutter {
+  0% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-rise {
+  animation: 0.6s cubic-bezier(0.32, 0.72, 0, 1) both rise;
+}
+
+.animate-slide-strip {
+  animation: 0.8s cubic-bezier(0.32, 0.72, 0, 1) 0.4s both slide-strip;
+}
+
+.animate-tick {
+  animation: 1s cubic-bezier(0.32, 0.72, 0, 1) infinite tick;
+}
+
+.animate-shutter {
+  animation: 0.45s ease-out both shutter;
+}
