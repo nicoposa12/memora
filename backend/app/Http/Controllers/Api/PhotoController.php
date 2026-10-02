@@ -167,6 +167,11 @@ class PhotoController extends Controller
      */
     private function getPhotoUrl(string $path, string $disk): string
     {
+        // If public CDN / dev URL is provided for R2, serve directly for high-speed delivery
+        if ($disk === 'r2' && config('filesystems.disks.r2.url')) {
+            return Storage::disk('r2')->url($path);
+        }
+
         if ($disk === 'r2' || $disk === 's3') {
             try {
                 // Return presigned URL valid for 60 minutes

@@ -258,6 +258,43 @@ export const ALL_STRIP_LAYOUTS: AvailableLayoutOption[] = [
 
 export const ALL_LAYOUT_IDS = ALL_STRIP_LAYOUTS.map(l => l.id);
 
+export function getTemplateNativeLayoutId(layoutStr?: string, templateId?: string): string {
+  if (templateId) {
+    const directMap: Record<string, string> = {
+      classic_filmstrip: 'filmstrip',
+      marais_darkroom: 'filmstrip',
+      marais_analog: 'filmstrip',
+      vogue_met: 'grid2x2',
+      soho_loft: 'grid2x2',
+      soho_cyber: 'grid2x2',
+      ritz_gala: 'strip4',
+      amalfi_wedding: 'strip4',
+      versailles_baroque: 'strip4',
+      versailles_gold: 'strip4',
+      yearbook_alumni: 'strip4',
+      rose_romance: 'strip3',
+      rose_velvet: 'strip3',
+      ivy_collegiate: 'strip3',
+      monaco_grandprix: 'duo',
+      monaco_emerald: 'duo',
+      kyoto_wabi: 'duo',
+      kyoto_gallery: 'duo',
+      hamptons_linen: 'polaroid',
+    };
+    if (directMap[templateId]) return directMap[templateId];
+  }
+  if (!layoutStr) return 'strip3';
+  const l = layoutStr.toLowerCase();
+  if (l.includes('film')) return 'filmstrip';
+  if (l.includes('2x3') || l.includes('6-photo')) return 'grid2x3';
+  if (l.includes('2x2') || l.includes('grid')) return 'grid2x2';
+  if (l.includes('polaroid') || l.includes('single')) return 'polaroid';
+  if (l.includes('duo')) return 'duo';
+  if (l.includes('3-photo') || l.includes('3-strip')) return 'strip3';
+  if (l.includes('4-pose') || l.includes('4-strip')) return 'strip4';
+  return 'strip3';
+}
+
 export function isLayoutUnlocked(plan: PlanConfig | undefined, layoutId: string): boolean {
   if (!plan) return false;
   const allowed = plan.allowedLayoutIds;
@@ -270,6 +307,7 @@ export function isLayoutUnlocked(plan: PlanConfig | undefined, layoutId: string)
   }
   if ((layoutId === 'grid4' || layoutId === 'grid2x2') && (allowed.includes('grid4') || allowed.includes('grid2x2'))) return true;
   if ((layoutId === 'single' || layoutId === 'polaroid') && (allowed.includes('single') || allowed.includes('polaroid'))) return true;
+
   return false;
 }
 
@@ -341,7 +379,7 @@ export const DEFAULT_PLANS: Record<'free' | 'pro' | 'studio', PlanConfig> = {
     downloads: 'Downloads & digital gallery',
     eventCoverage: '1 Single Event',
     allowedTemplateIds: ['classic_filmstrip', 'vogue_met'],
-    allowedLayoutIds: ['strip3', 'filmstrip'],
+    allowedLayoutIds: ['strip4', 'strip3', 'grid2x2', 'filmstrip', 'grid2x3'],
     allowedEventTypes: ['other'],
     gifExport: true,
     features: [
@@ -479,6 +517,15 @@ export function saveStoredPlans(plans: Record<'free' | 'pro' | 'studio', PlanCon
   } catch (e) {
     console.error('Error saving plans:', e);
   }
+
+  // Persist to server API to keep Chrome, Edge, mobile, and guest browsers synchronized
+  try {
+    fetch('/api/plans', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(plans),
+    }).catch(() => {});
+  } catch {}
 }
 
 export function resetStoredPlans(): Record<'free' | 'pro' | 'studio', PlanConfig> {
@@ -487,6 +534,11 @@ export function resetStoredPlans(): Record<'free' | 'pro' | 'studio', PlanConfig
       localStorage.removeItem(PLANS_STORAGE_KEY);
       window.dispatchEvent(new CustomEvent('memora:plans_updated', { detail: DEFAULT_PLANS }));
       broadcastRealtime('PLANS_UPDATED', DEFAULT_PLANS);
+      fetch('/api/plans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(DEFAULT_PLANS),
+      }).catch(() => {});
     } catch {}
   }
   return DEFAULT_PLANS;
@@ -496,9 +548,23 @@ export function usePlans() {
   const [plans, setPlans] = useState<Record<'free' | 'pro' | 'studio', PlanConfig>>(DEFAULT_PLANS);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  const reloadPlans = useCallback(() => {
-    setPlans(getStoredPlans());
+  const reloadPlans = useCallback(async () => {
+    const local = getStoredPlans();
+    setPlans(local);
     setIsLoaded(true);
+
+    try {
+      const res = await fetch('/api/plans');
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.success && data?.plans) {
+          setPlans(data.plans);
+          try {
+            localStorage.setItem(PLANS_STORAGE_KEY, JSON.stringify(data.plans));
+          } catch {}
+        }
+      }
+    } catch {}
   }, []);
 
   useEffect(() => {

@@ -43,10 +43,12 @@ import {
   AvailableTemplateOption, 
   isTemplateUnlocked,
   ALL_STRIP_LAYOUTS,
+  ALL_LAYOUT_IDS,
   AvailableLayoutOption,
   isLayoutUnlocked,
   ALL_EVENT_TYPE_IDS,
   isEventTypeUnlocked,
+  getTemplateNativeLayoutId,
 } from '@/lib/plans';
 import { EVENT_TYPES_LIST, getEventEmoji, getEventLabel, getEventBareLabel } from '@/types';
 import { useModal } from '@/context/ModalContext';
@@ -256,9 +258,11 @@ export default function AdminPlansPage() {
   const [newFeatureText, setNewFeatureText] = useState('');
   const [newFeatureHighlight, setNewFeatureHighlight] = useState(false);
   const [allTemplates, setAllTemplates] = useState<AvailableTemplateOption[]>(ALL_SYSTEM_TEMPLATES);
-  const [matrixTab, setMatrixTab] = useState<'templates' | 'events'>('templates');
+  const [matrixTab, setMatrixTab] = useState<'templates' | 'layouts' | 'events'>('templates');
   const [templateSearch, setTemplateSearch] = useState('');
   const [templateFilterTab, setTemplateFilterTab] = useState<'all' | 'included' | 'locked'>('all');
+  const [layoutSearch, setLayoutSearch] = useState('');
+  const [layoutFilterTab, setLayoutFilterTab] = useState<'all' | 'included' | 'locked'>('all');
   const [eventSearch, setEventSearch] = useState('');
   const [eventFilterTab, setEventFilterTab] = useState<'all' | 'included' | 'locked'>('all');
   const [previewEventType, setPreviewEventType] = useState<string>('wedding');
@@ -465,21 +469,32 @@ export default function AdminPlansPage() {
       nextAllowed = [...currentAllowed, templateId];
       setPreviewTemplateId(templateId);
       const foundTpl = allTemplates.find((t) => t.id === templateId);
-      if (foundTpl?.layout) {
-        const l = foundTpl.layout.toLowerCase();
-        if (l.includes('film') && isLayoutUnlocked(activePlan, 'filmstrip')) setPreviewLayoutId('filmstrip');
-        else if ((l.includes('2x3') || l.includes('6-photo')) && isLayoutUnlocked(activePlan, 'grid2x3')) setPreviewLayoutId('grid2x3');
-        else if ((l.includes('2x2') || l.includes('grid')) && isLayoutUnlocked(activePlan, 'grid2x2')) setPreviewLayoutId('grid2x2');
-        else if (l.includes('polaroid') && isLayoutUnlocked(activePlan, 'polaroid')) setPreviewLayoutId('polaroid');
-        else if (l.includes('duo') && isLayoutUnlocked(activePlan, 'duo')) setPreviewLayoutId('duo');
-        else if (l.includes('3-photo') && isLayoutUnlocked(activePlan, 'strip3')) setPreviewLayoutId('strip3');
-        else if (l.includes('4-pose') && isLayoutUnlocked(activePlan, 'strip4')) setPreviewLayoutId('strip4');
+      const nativeLayout = getTemplateNativeLayoutId(foundTpl?.layout, templateId);
+      if (nativeLayout) {
+        setPreviewLayoutId(nativeLayout);
+      }
+    }
+
+    let nextLayoutIds = draftPlans[activePlanId].allowedLayoutIds;
+    if (!isIncluded) {
+      const foundTpl = allTemplates.find((t) => t.id === templateId);
+      const nativeLayout = getTemplateNativeLayoutId(foundTpl?.layout, templateId);
+      if (
+        nativeLayout &&
+        Array.isArray(nextLayoutIds) &&
+        nextLayoutIds.length > 0 &&
+        !nextLayoutIds.includes('*') &&
+        !nextLayoutIds.includes('all') &&
+        !nextLayoutIds.includes(nativeLayout)
+      ) {
+        nextLayoutIds = [...nextLayoutIds, nativeLayout];
       }
     }
 
     const testPlan: PlanConfig = {
       ...activePlan,
       allowedTemplateIds: nextAllowed,
+      allowedLayoutIds: nextLayoutIds,
     };
     const unlockedCount = allTemplates.filter((t) => isTemplateUnlocked(testPlan, t.id)).length;
 
@@ -494,6 +509,7 @@ export default function AdminPlansPage() {
       [activePlanId]: {
         ...draftPlans[activePlanId],
         allowedTemplateIds: nextAllowed,
+        allowedLayoutIds: nextLayoutIds,
         templatesUnlocked: summaryText,
       },
     };
@@ -575,6 +591,76 @@ export default function AdminPlansPage() {
       [activePlanId]: {
         ...draftPlans[activePlanId],
         allowedEventTypes: [],
+      },
+    };
+    applyAndPersistPlans(nextPlans);
+  };
+
+  const handleToggleLayout = (layoutId: string) => {
+    let currentAllowed: string[];
+    if (!activePlan.allowedLayoutIds || activePlan.allowedLayoutIds.length === 0) {
+      currentAllowed = activePlanId === 'free' 
+        ? ['strip3', 'filmstrip'] 
+        : ALL_LAYOUT_IDS;
+    } else if (activePlan.allowedLayoutIds.includes('*') || activePlan.allowedLayoutIds.includes('all')) {
+      currentAllowed = ALL_LAYOUT_IDS;
+    } else {
+      currentAllowed = activePlan.allowedLayoutIds;
+    }
+
+    const isIncluded = isLayoutUnlocked(activePlan, layoutId);
+    let nextAllowed: string[];
+
+    const aliasMap: Record<string, string[]> = {
+      grid4: ['grid2x2'],
+      grid2x2: ['grid4'],
+      single: ['polaroid'],
+      polaroid: ['single'],
+    };
+
+    if (isIncluded) {
+      const toRemove = new Set([layoutId, ...(aliasMap[layoutId] || [])]);
+      nextAllowed = currentAllowed.filter((id) => !toRemove.has(id));
+      if (toRemove.has(previewLayoutId)) {
+        const remaining = ALL_STRIP_LAYOUTS.find((l) => !toRemove.has(l.id) && nextAllowed.includes(l.id));
+        if (remaining) {
+          setPreviewLayoutId(remaining.id);
+        }
+      }
+    } else {
+      nextAllowed = [...currentAllowed, layoutId];
+      setPreviewLayoutId(layoutId);
+    }
+
+    const nextPlans: Record<'free' | 'pro' | 'studio', PlanConfig> = {
+      ...draftPlans,
+      [activePlanId]: {
+        ...draftPlans[activePlanId],
+        allowedLayoutIds: nextAllowed,
+      },
+    };
+
+    applyAndPersistPlans(nextPlans);
+  };
+
+  const handleSelectAllLayouts = () => {
+    const allIds = ALL_LAYOUT_IDS;
+    const nextPlans: Record<'free' | 'pro' | 'studio', PlanConfig> = {
+      ...draftPlans,
+      [activePlanId]: {
+        ...draftPlans[activePlanId],
+        allowedLayoutIds: allIds,
+      },
+    };
+    applyAndPersistPlans(nextPlans);
+  };
+
+  const handleClearAllLayouts = () => {
+    const nextPlans: Record<'free' | 'pro' | 'studio', PlanConfig> = {
+      ...draftPlans,
+      [activePlanId]: {
+        ...draftPlans[activePlanId],
+        allowedLayoutIds: [],
       },
     };
     applyAndPersistPlans(nextPlans);
@@ -1200,12 +1286,12 @@ export default function AdminPlansPage() {
                 </span>
               </div>
               <h2 className="font-display text-2xl font-light text-foreground mt-0.5">
-                Template Access & Event Types
+                Template, Layout & Event Access
               </h2>
             </div>
           </div>
 
-          {/* Subtab Switcher: Templates vs Event Types */}
+          {/* Subtab Switcher: Templates vs Strip Layouts vs Event Types */}
           <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-secondary/50 dark:bg-card/60 border border-border/70 shadow-2xs">
             <button
               type="button"
@@ -1227,6 +1313,28 @@ export default function AdminPlansPage() {
                   : 'bg-secondary text-muted-foreground border border-border/60'
               }`}>
                 {allTemplates.filter(t => isTemplateUnlocked(activePlan, t.id)).length}/{allTemplates.length}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMatrixTab('layouts');
+                setPreviewMode('template');
+              }}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-2 ${
+                matrixTab === 'layouts'
+                  ? 'bg-card text-primary font-semibold shadow-xs border border-primary/25'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-secondary/60 border border-transparent'
+              }`}
+            >
+              <Columns className={`w-3.5 h-3.5 ${matrixTab === 'layouts' ? 'text-primary' : 'text-muted-foreground/70'}`} />
+              <span>Strip Layouts</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono transition-colors ${
+                matrixTab === 'layouts'
+                  ? 'bg-primary/10 text-primary font-semibold border border-primary/20'
+                  : 'bg-secondary text-muted-foreground border border-border/60'
+              }`}>
+                {ALL_STRIP_LAYOUTS.filter(l => isLayoutUnlocked(activePlan, l.id)).length}/{ALL_STRIP_LAYOUTS.length}
               </span>
             </button>
             <button
@@ -1423,8 +1531,167 @@ export default function AdminPlansPage() {
                     })}
                 </div>
               </div>
+            ) : matrixTab === 'layouts' ? (
+              /* TAB 2: STRIP LAYOUTS */
+              <div className="space-y-4">
+                {/* Search & Filter Bar */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="relative w-full sm:w-64">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60" />
+                    <input
+                      type="text"
+                      value={layoutSearch}
+                      onChange={(e) => setLayoutSearch(e.target.value)}
+                      placeholder="Search strip layouts..."
+                      className="w-full pl-9 pr-3 py-1.5 bg-secondary/50 border border-border/70 rounded-xl text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary font-mono shadow-2xs"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                    <div className="flex items-center gap-1 bg-secondary/50 p-1 rounded-xl border border-border/60">
+                      {(['all', 'included', 'locked'] as const).map((tab) => {
+                        const activeCount = ALL_STRIP_LAYOUTS.filter((l) => isLayoutUnlocked(activePlan, l.id)).length;
+                        return (
+                          <button
+                            key={tab}
+                            type="button"
+                            onClick={() => setLayoutFilterTab(tab)}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-mono uppercase tracking-wider transition-all cursor-pointer capitalize ${
+                              layoutFilterTab === tab
+                                ? 'bg-foreground text-background font-semibold shadow-xs'
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                          >
+                            {tab === 'all'
+                              ? `All (${ALL_STRIP_LAYOUTS.length})`
+                              : tab === 'included'
+                              ? `Included (${activeCount})`
+                              : `Locked (${ALL_STRIP_LAYOUTS.length - activeCount})`}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={handleSelectAllLayouts}
+                        className="px-2.5 py-1.5 rounded-lg border border-border hover:bg-secondary text-[10px] font-mono uppercase tracking-wider text-foreground hover:text-primary transition-all cursor-pointer shadow-2xs font-medium"
+                      >
+                        All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleClearAllLayouts}
+                        className="px-2.5 py-1.5 rounded-lg border border-border hover:bg-secondary text-[10px] font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground transition-all cursor-pointer shadow-2xs"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Strip Layouts Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[640px] overflow-y-auto pr-1">
+                  {ALL_STRIP_LAYOUTS
+                    .filter((layout) => {
+                      const isIncluded = isLayoutUnlocked(activePlan, layout.id);
+                      if (layoutFilterTab === 'included' && !isIncluded) return false;
+                      if (layoutFilterTab === 'locked' && isIncluded) return false;
+                      if (layoutSearch.trim()) {
+                        const q = layoutSearch.toLowerCase();
+                        return (
+                          layout.name.toLowerCase().includes(q) ||
+                          layout.badge.toLowerCase().includes(q) ||
+                          layout.poses.toLowerCase().includes(q) ||
+                          layout.label.toLowerCase().includes(q)
+                        );
+                      }
+                      return true;
+                    })
+                    .map((layout) => {
+                      const isIncluded = isLayoutUnlocked(activePlan, layout.id);
+                      const isPreviewing = previewLayoutId === layout.id;
+                      const IconComp = getLayoutIcon(layout.id);
+
+                      return (
+                        <div
+                          key={layout.id}
+                          onClick={() => handleToggleLayout(layout.id)}
+                          className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between gap-3 text-left relative group select-none shadow-2xs ${
+                            isPreviewing
+                              ? 'ring-2 ring-primary border-primary bg-primary/[0.04]'
+                              : isIncluded
+                              ? 'bg-secondary/40 border-border/80 hover:border-foreground/30'
+                              : 'bg-card border-border/60 opacity-60 hover:opacity-100'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20 shrink-0">
+                                <IconComp className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <span className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors block leading-tight">
+                                  {layout.name}
+                                </span>
+                                <span className="text-[10px] font-mono text-muted-foreground">
+                                  {layout.poses} • {layout.badge}
+                                </span>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              title={isIncluded ? `Remove ${layout.name} from ${activePlan.name}` : `Include ${layout.name} in ${activePlan.name}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleLayout(layout.id);
+                              }}
+                              className={`w-6 h-6 rounded-lg border flex items-center justify-center shrink-0 transition-colors cursor-pointer ${
+                                isIncluded 
+                                  ? 'bg-primary border-primary text-primary-foreground' 
+                                  : 'border-border/80 bg-background text-transparent hover:border-primary/50'
+                              }`}
+                            >
+                              <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                            </button>
+                          </div>
+
+                          <p className="text-[11px] text-muted-foreground font-light line-clamp-2 leading-relaxed">
+                            {layout.description}
+                          </p>
+
+                          <div className="pt-2 border-t border-border/50 flex items-center justify-between text-[10px] font-mono">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPreviewLayoutId(layout.id);
+                              }}
+                              className={`flex items-center gap-1 font-semibold cursor-pointer ${
+                                isPreviewing ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                              }`}
+                            >
+                              <Eye className="w-3 h-3" />
+                              <span>{isPreviewing ? 'Previewing' : 'Preview'}</span>
+                            </button>
+
+                            <span className={`px-2 py-0.5 rounded-full font-semibold ${
+                              isIncluded
+                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                                : 'bg-secondary text-muted-foreground border border-border/60'
+                            }`}>
+                              {isIncluded ? 'Included' : 'Locked'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
             ) : (
-              /* TAB 2: EVENT TYPES */
+              /* TAB 3: EVENT TYPES */
               <div className="space-y-4">
                 {/* Search & Filter Bar */}
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -1787,17 +2054,39 @@ export default function AdminPlansPage() {
                     </div>
                   )}
 
-                  {/* Photo Strip Layouts Dropdown Selector */}
+                  {/* Photo Strip Layouts Dropdown Selector & Quick Unlock Toggle */}
                   <div className="p-2.5 rounded-xl bg-secondary/35 border border-border/60 space-y-1.5 text-[10px] font-mono">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5 text-muted-foreground">
                         <Columns className="w-3.5 h-3.5 text-primary shrink-0" />
                         <span className="text-foreground font-medium uppercase tracking-wider">Strip Layout</span>
                       </div>
-                      <span className="px-2 py-0.5 rounded-full font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1 text-[9px]">
-                        <Check className="w-2.5 h-2.5 stroke-[2.5]" />
-                        <span>Included in PRO Pass</span>
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleLayout(previewLayoutId)}
+                        className={`px-2 py-0.5 rounded-full font-semibold border flex items-center gap-1 text-[9px] transition-all cursor-pointer ${
+                          isLayoutUnlocked(activePlan, previewLayoutId)
+                            ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
+                            : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/25'
+                        }`}
+                        title={
+                          isLayoutUnlocked(activePlan, previewLayoutId)
+                            ? `Click to lock this layout for ${activePlan.name}`
+                            : `Click to unlock this layout for ${activePlan.name}`
+                        }
+                      >
+                        {isLayoutUnlocked(activePlan, previewLayoutId) ? (
+                          <>
+                            <Check className="w-2.5 h-2.5 stroke-[2.5]" />
+                            <span>Included in {activePlan.name} (Click to Lock)</span>
+                          </>
+                        ) : (
+                          <>
+                            <Lock className="w-2.5 h-2.5" />
+                            <span>Locked in {activePlan.name} (Click to Unlock)</span>
+                          </>
+                        )}
+                      </button>
                     </div>
 
                     <div className="relative">
@@ -1807,13 +2096,42 @@ export default function AdminPlansPage() {
                         onChange={(e) => setPreviewLayoutId(e.target.value)}
                         className="w-full appearance-none bg-card hover:bg-card/90 border border-border/80 focus:border-primary focus:ring-1 focus:ring-primary/30 rounded-xl px-3 py-2 pr-9 text-xs font-mono text-foreground font-medium transition-all cursor-pointer shadow-2xs outline-none"
                       >
-                        {ALL_STRIP_LAYOUTS.map((layout) => (
-                          <option key={layout.id} value={layout.id} className="bg-popover text-popover-foreground py-1.5">
-                            {layout.name} — {layout.poses} ({layout.badge})
-                          </option>
-                        ))}
+                        {ALL_STRIP_LAYOUTS.map((layout) => {
+                          const isUnlocked = isLayoutUnlocked(activePlan, layout.id);
+                          return (
+                            <option key={layout.id} value={layout.id} className="bg-popover text-popover-foreground py-1.5">
+                              {isUnlocked ? '✓ ' : '🔒 '} {layout.name} — {layout.poses} ({isUnlocked ? 'Included' : 'Locked'})
+                            </option>
+                          );
+                        })}
                       </select>
                       <ChevronDown className="w-3.5 h-3.5 text-muted-foreground pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" />
+                    </div>
+
+                    {/* Quick Switcher Pills for Strip Layouts */}
+                    <div className="flex items-center gap-1 overflow-x-auto pt-1 pb-0.5 scrollbar-none">
+                      {ALL_STRIP_LAYOUTS.map((layout) => {
+                        const isSelected = previewLayoutId === layout.id;
+                        const isUnlocked = isLayoutUnlocked(activePlan, layout.id);
+                        return (
+                          <button
+                            key={layout.id}
+                            type="button"
+                            onClick={() => setPreviewLayoutId(layout.id)}
+                            className={`px-2 py-0.5 rounded-lg text-[9px] font-mono whitespace-nowrap transition-all cursor-pointer border flex items-center gap-1 ${
+                              isSelected
+                                ? 'bg-foreground text-background border-foreground font-semibold shadow-2xs'
+                                : isUnlocked
+                                ? 'bg-secondary/60 text-foreground border-border/60 hover:bg-secondary'
+                                : 'bg-secondary/20 text-muted-foreground/70 border-border/40 hover:text-muted-foreground'
+                            }`}
+                            title={`${layout.name} — ${isUnlocked ? `Included in ${activePlan.name}` : `Locked in ${activePlan.name}`}`}
+                          >
+                            <span>{isUnlocked ? '✓' : '🔒'}</span>
+                            <span>{layout.label}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 

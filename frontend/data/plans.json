@@ -1,0 +1,255 @@
+{
+  "free": {
+    "id": "free",
+    "name": "Free Trial",
+    "eyebrow": "FREE TIER",
+    "badge": "NO CARD NEEDED",
+    "price": 0,
+    "priceDisplay": "₱0",
+    "period": "single event",
+    "summary": "Standard 3-photo strip for booth testing & private events",
+    "watermark": true,
+    "maxPhotos": 50,
+    "templatesUnlocked": "2 Templates Included",
+    "filtersUnlocked": "3 Classic Filters",
+    "downloads": "Downloads & digital gallery",
+    "eventCoverage": "1 Single Event",
+    "allowedTemplateIds": [
+      "classic_filmstrip",
+      "vogue_met"
+    ],
+    "allowedLayoutIds": [
+      "strip4",
+      "strip3",
+      "grid2x2",
+      "filmstrip",
+      "grid2x3"
+    ],
+    "allowedEventTypes": [
+      "other"
+    ],
+    "gifExport": true,
+    "features": [
+      {
+        "id": "f1",
+        "text": "50 photos per event",
+        "included": true
+      },
+      {
+        "id": "f2",
+        "text": "1 standard 3-photo strip layout",
+        "included": true
+      },
+      {
+        "id": "f_gif",
+        "text": "Animated Strip GIF generation & export",
+        "included": true
+      },
+      {
+        "id": "f3",
+        "text": "3 vintage & monochrome filters",
+        "included": true
+      },
+      {
+        "id": "f4",
+        "text": "Includes Memora discreet watermark",
+        "included": true
+      },
+      {
+        "id": "f5",
+        "text": "Digital gallery & standard downloads",
+        "included": true
+      }
+    ]
+  },
+  "pro": {
+    "id": "pro",
+    "name": "PRO Pass",
+    "eyebrow": "EVENT PASS",
+    "badge": "MOST POPULAR",
+    "price": 1499,
+    "priceDisplay": "₱1,499",
+    "period": "per event · 1 month access",
+    "summary": "Full event pass with premium templates, zero watermark, and 1-month active access",
+    "watermark": false,
+    "maxPhotos": -1,
+    "templatesUnlocked": "All Templates & Layouts Unlocked",
+    "filtersUnlocked": "Premium Filters & Frames",
+    "downloads": "Event gallery & HD downloads",
+    "eventCoverage": "Full coverage for School, Beach, Party, Wedding, Birthday, Graduation & Corporate",
+    "allowedTemplateIds": [
+      "classic_filmstrip",
+      "vogue_met",
+      "ritz_gala",
+      "amalfi_wedding",
+      "marais_darkroom",
+      "versailles_baroque",
+      "soho_loft",
+      "rose_romance",
+      "monaco_grandprix",
+      "kyoto_wabi",
+      "hamptons_linen",
+      "ivy_collegiate",
+      "yearbook_alumni"
+    ],
+    "allowedLayoutIds": [
+      "strip4",
+      "strip3",
+      "grid2x2",
+      "grid2x3",
+      "filmstrip",
+      "polaroid",
+      "duo"
+    ],
+    "allowedEventTypes": [
+      "school",
+      "beach",
+      "party",
+      "wedding",
+      "birthday",
+      "graduation",
+      "corporate"
+    ],
+    "gifExport": true,
+    "features": [
+      {
+        "id": "p1",
+        "text": "Unlimited photos for 1 full event",
+        "included": true,
+        "highlight": true
+      },
+      {
+        "id": "p_validity",
+        "text": "1-month active event access & live gallery countdown",
+        "included": true,
+        "highlight": true
+      },
+      {
+        "id": "p_events",
+        "text": "Full coverage for School, Beach, Party, Wedding, Birthday, Graduation & Corporate",
+        "included": true,
+        "highlight": true
+      },
+      {
+        "id": "p2",
+        "text": "All 7 strip layouts & 10 designer presets",
+        "included": true,
+        "highlight": true
+      },
+      {
+        "id": "p_gif",
+        "text": "Animated Strip GIF generation & export",
+        "included": true,
+        "highlight": true
+      },
+      {
+        "id": "p3",
+        "text": "Zero watermark & custom event header",
+        "included": true,
+        "highlight": true
+      },
+      {
+        "id": "p4",
+        "text": "Premium filters & live countdowns",
+        "included": true
+      },
+      {
+        "id": "p5",
+        "text": "Full live event gallery & HD guest downloads",
+        "included": true
+      }
+    ]
+  },
+  "studio": {
+    "id": "studio",
+    "name": "STUDIO Monthly",
+    "eyebrow": "WORKSPACE SUBSCRIPTION",
+    "badge": "UNLIMITED",
+    "price": 4999,
+    "priceDisplay": "₱4,999",
+    "period": "per month · all events included",
+    "summary": "Complete platform access for photobooth businesses & event planners",
+    "watermark": false,
+    "maxPhotos": -1,
+    "templatesUnlocked": "All Templates & Layouts Unlocked",
+    "filtersUnlocked": "All Filters & Custom Themes",
+    "downloads": "Full High-Resolution Archive & Bulk ZIP",
+    "eventCoverage": "Unlimited events across School, Beach, Party, Wedding, Birthday, Graduation & Corporate",
+    "allowedTemplateIds": [
+      "classic_filmstrip",
+      "vogue_met",
+      "ritz_gala",
+      "amalfi_wedding",
+      "marais_darkroom",
+      "versailles_baroque",
+      "soho_loft",
+      "rose_romance",
+      "monaco_grandprix",
+      "kyoto_wabi",
+      "hamptons_linen",
+      "ivy_collegiate",
+      "yearbook_alumni"
+    ],
+    "allowedLayoutIds": [
+      "strip4",
+      "strip3",
+      "grid2x2",
+      "grid2x3",
+      "filmstrip",
+      "polaroid",
+      "duo"
+    ],
+    "allowedEventTypes": [
+      "school",
+      "beach",
+      "party",
+      "wedding",
+      "birthday",
+      "graduation",
+      "corporate"
+    ],
+    "gifExport": true,
+    "features": [
+      {
+        "id": "s1",
+        "text": "Unlimited events covered concurrently",
+        "included": true,
+        "highlight": true
+      },
+      {
+        "id": "s_events",
+        "text": "Unlimited coverage across School, Beach, Party, Wedding, Birthday, Graduation & Corporate",
+        "included": true,
+        "highlight": true
+      },
+      {
+        "id": "s2",
+        "text": "All 10 templates & custom fonts/colors",
+        "included": true,
+        "highlight": true
+      },
+      {
+        "id": "s_gif",
+        "text": "Animated Strip GIF generation & export",
+        "included": true,
+        "highlight": true
+      },
+      {
+        "id": "s3",
+        "text": "Custom studio branding & zero watermark",
+        "included": true,
+        "highlight": true
+      },
+      {
+        "id": "s4",
+        "text": "Multi-organizer team access & export analytics",
+        "included": true
+      },
+      {
+        "id": "s5",
+        "text": "Retention grace period protection",
+        "included": true
+      }
+    ]
+  }
+}

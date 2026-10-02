@@ -16,6 +16,11 @@ rm -f bootstrap/cache/*.php
 # Discover packages since --no-scripts was used during composer build
 php artisan package:discover --ansi || true
 
+# Ensure public storage symlink exists
+if [ ! -L public/storage ]; then
+    php artisan storage:link || true
+fi
+
 # Run database migrations if requested
 if [ "$RUN_MIGRATIONS" = "true" ]; then
     echo "Running database migrations..."
@@ -28,5 +33,6 @@ if [ "$APP_ENV" = "production" ]; then
     php artisan route:cache || true
 fi
 
-echo "Starting Laravel server on port 8000..."
-exec php artisan serve --host=0.0.0.0 --port=8000
+PORT="${PORT:-8000}"
+echo "Starting Laravel server on port $PORT..."
+exec php artisan serve --host=0.0.0.0 --port="$PORT"

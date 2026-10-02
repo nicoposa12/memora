@@ -15,6 +15,7 @@ import {
   DEFAULT_PLANS,
   ALL_SYSTEM_TEMPLATES,
   AvailableTemplateOption,
+  getTemplateNativeLayoutId,
 } from '@/lib/plans';
 import { getEventEmoji, getEventLabel, getEventBareLabel } from '@/types';
 import {
@@ -96,13 +97,13 @@ export const FILTERS: FilterOption[] = [
 ];
 
 export const LAYOUTS: LayoutOption[] = [
-  { id: 'polaroid', label: 'Single', shots: 1, columns: 1 },
-  { id: 'strip3', label: '3-strip', shots: 3, columns: 1 },
-  { id: 'strip4', label: '4-strip', shots: 4, columns: 1 },
-  { id: 'grid2x2', label: '2x2 grid', shots: 4, columns: 2 },
-  { id: 'grid2x3', label: '2x3 grid', shots: 6, columns: 2 },
-  { id: 'filmstrip', label: '35mm Film', shots: 3, columns: 1 },
-  { id: 'duo', label: 'Duo', shots: 2, columns: 1 },
+  { id: 'strip3', label: '3-Photo Strip', shots: 3, columns: 1 },
+  { id: 'strip4', label: '4-Pose Strip', shots: 4, columns: 1 },
+  { id: 'filmstrip', label: '35mm Filmstrip', shots: 3, columns: 1 },
+  { id: 'grid2x2', label: '2x2 Quad Grid', shots: 4, columns: 2 },
+  { id: 'grid2x3', label: '2x3 Hexa Grid', shots: 6, columns: 2 },
+  { id: 'duo', label: 'Minimalist Duo', shots: 2, columns: 1 },
+  { id: 'polaroid', label: 'Single Polaroid', shots: 1, columns: 1 },
 ];
 
 export const FRAMES: FrameOption[] = [
@@ -3029,15 +3030,7 @@ export function MemoraBooth({
   const [isRenderingGif, setIsRenderingGif] = useState<boolean>(false);
   const [previewFormat, setPreviewFormat] = useState<'strip' | 'gif'>('strip');
   const [renderError, setRenderError] = useState<string | null>(null);
-  const [activePlanConfig, setActivePlanConfig] = useState<PlanConfig>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const plans = getStoredPlans();
-        return plans.free || DEFAULT_PLANS.free;
-      } catch {}
-    }
-    return DEFAULT_PLANS.free;
-  });
+  const [activePlanConfig, setActivePlanConfig] = useState<PlanConfig>(DEFAULT_PLANS.free);
 
   // Load custom templates if configured by admin in localStorage
   useEffect(() => {
@@ -3095,10 +3088,27 @@ export function MemoraBooth({
       } catch {}
     }
 
-    const updatePlan = (directPlans?: Record<string, PlanConfig>) => {
+    const updatePlan = async (directPlans?: Record<string, PlanConfig>) => {
+      if (directPlans) {
+        setActivePlanConfig(directPlans[matchedPlanKey] || DEFAULT_PLANS[matchedPlanKey]);
+        return;
+      }
       try {
-        const plans = directPlans || getStoredPlans();
-        setActivePlanConfig(plans[matchedPlanKey] || DEFAULT_PLANS[matchedPlanKey]);
+        const stored = getStoredPlans();
+        if (stored?.[matchedPlanKey]) {
+          setActivePlanConfig(stored[matchedPlanKey]);
+        }
+        // Authoritative cross-browser sync from server API
+        const res = await fetch('/api/plans');
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.success && data?.plans?.[matchedPlanKey]) {
+            setActivePlanConfig(data.plans[matchedPlanKey]);
+            try {
+              localStorage.setItem('memora_plans_config', JSON.stringify(data.plans));
+            } catch {}
+          }
+        }
       } catch {
         setActivePlanConfig(DEFAULT_PLANS[matchedPlanKey]);
       }
@@ -3160,33 +3170,37 @@ export function MemoraBooth({
   }, [eventName]);
 
   // Ensure an unlocked layout and template are chosen on initial load or plan change
-  const initialSyncRef = useRef<string>('');
   useEffect(() => {
-    if (activePlanConfig && initialSyncRef.current !== activePlanConfig.id) {
-      initialSyncRef.current = activePlanConfig.id;
-      if (!isLayoutUnlocked(activePlanConfig, layoutId)) {
-        const firstUnlocked = LAYOUTS.find((l) => isLayoutUnlocked(activePlanConfig, l.id));
-        if (firstUnlocked) setLayoutId(firstUnlocked.id);
+    if (activePlanConfig) {
+      let currentTpl = allTemplates.find((t) => t.id === templateId && isTemplateUnlocked(activePlanConfig, t.id));
+      if (!currentTpl) {
+        currentTpl = allTemplates.find((t) => isTemplateUnlocked(activePlanConfig, t.id));
+        if (currentTpl) setTemplateId(currentTpl.id);
       }
-      if (!isTemplateUnlocked(activePlanConfig, templateId)) {
-        const firstUnlocked = allTemplates.find((t) => isTemplateUnlocked(activePlanConfig, t.id));
-        if (firstUnlocked) setTemplateId(firstUnlocked.id);
+
+      if (currentTpl) {
+        const nativeLayout = getTemplateNativeLayoutId(currentTpl.layout, currentTpl.id);
+        if (isLayoutUnlocked(activePlanConfig, nativeLayout) && (!layoutId || !isLayoutUnlocked(activePlanConfig, layoutId))) {
+          setLayoutId(nativeLayout);
+        } else if (!isLayoutUnlocked(activePlanConfig, layoutId)) {
+          const firstUnlocked = LAYOUTS.find((l) => isLayoutUnlocked(activePlanConfig, l.id));
+          if (firstUnlocked) setLayoutId(firstUnlocked.id);
+        }
       }
     }
-  }, [activePlanConfig, allTemplates]);
+  }, [activePlanConfig, allTemplates, layoutId, templateId]);
 
-  // Sort templates so unlocked ones appear first, followed by locked ones
-  const sortedTemplates = React.useMemo(() => {
-    return [...allTemplates].sort((a, b) => {
-      const aUnlocked = isTemplateUnlocked(activePlanConfig, a.id);
-      const bUnlocked = isTemplateUnlocked(activePlanConfig, b.id);
-      if (aUnlocked && !bUnlocked) return -1;
-      if (!aUnlocked && bUnlocked) return 1;
-      return 0;
-    });
+  // Only display unlocked templates for the active plan
+  const unlockedTemplates = React.useMemo(() => {
+    return allTemplates.filter((t) => isTemplateUnlocked(activePlanConfig, t.id));
   }, [allTemplates, activePlanConfig]);
 
-  const visibleTemplates = showAllTemplates ? sortedTemplates : sortedTemplates.slice(0, 6);
+  const visibleTemplates = showAllTemplates || unlockedTemplates.length <= 12 ? unlockedTemplates : unlockedTemplates.slice(0, 12);
+
+  // Only display unlocked strip layouts for the active plan
+  const unlockedLayouts = React.useMemo(() => {
+    return LAYOUTS.filter((l) => isLayoutUnlocked(activePlanConfig, l.id));
+  }, [activePlanConfig]);
 
   const selectedTemplate = allTemplates.find((t) => t.id === templateId) || ALL_SYSTEM_TEMPLATES[0];
   const isLight = isLightColor(selectedTemplate.frameColor);
@@ -3263,19 +3277,12 @@ export function MemoraBooth({
   const isTemplateActiveUnlocked = isTemplateUnlocked(activePlanConfig, templateId);
   const isLayoutActiveUnlocked = isLayoutUnlocked(activePlanConfig, layoutId);
   const isShootable = isTemplateActiveUnlocked && isLayoutActiveUnlocked;
-  const requiredTierName = activePlanConfig.id === 'pro' ? 'Studio' : 'Pro';
 
   const handleSelectTemplate = (tpl: AvailableTemplateOption) => {
     setTemplateId(tpl.id);
-    if (tpl.layout) {
-      const l = tpl.layout.toLowerCase();
-      if (l.includes('film')) setLayoutId('filmstrip');
-      else if (l.includes('2x3') || l.includes('6-photo')) setLayoutId('grid2x3');
-      else if (l.includes('2x2') || l.includes('grid')) setLayoutId('grid2x2');
-      else if (l.includes('polaroid')) setLayoutId('polaroid');
-      else if (l.includes('duo')) setLayoutId('duo');
-      else if (l.includes('3-photo')) setLayoutId('strip3');
-      else if (l.includes('4-pose')) setLayoutId('strip4');
+    const nativeLayout = getTemplateNativeLayoutId(tpl.layout, tpl.id);
+    if (nativeLayout && isLayoutUnlocked(activePlanConfig, nativeLayout)) {
+      setLayoutId(nativeLayout);
     }
   };
 
@@ -3578,7 +3585,6 @@ export function MemoraBooth({
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {visibleTemplates.map((tpl) => {
-                      const unlocked = isTemplateUnlocked(activePlanConfig, tpl.id);
                       const isSelected = templateId === tpl.id;
 
                       return (
@@ -3588,14 +3594,10 @@ export function MemoraBooth({
                           onClick={() => handleSelectTemplate(tpl)}
                           className={`relative flex items-center gap-2.5 rounded-2xl p-2.5 text-left text-xs transition-all cursor-pointer ${
                             isSelected
-                              ? !unlocked
-                                ? 'bg-amber-500/20 text-cream border border-amber-500/60 ring-2 ring-amber-500/50 shadow-md'
-                                : 'bg-cream/15 text-cream border border-cream/50 ring-2 ring-primary/50 shadow-md'
-                              : !unlocked
-                              ? 'opacity-65 bg-cream/5 text-cream/70 border border-white/5 hover:opacity-100 hover:bg-cream/10'
+                              ? 'bg-cream/15 text-cream border border-cream/50 ring-2 ring-primary/50 shadow-md'
                               : 'bg-cream/5 text-cream/70 border border-white/5 hover:bg-cream/10'
                           }`}
-                          title={unlocked ? tpl.name : `${tpl.name} (Preview only - Locked in ${activePlanConfig.name})`}
+                          title={tpl.name}
                         >
                           <span
                             className="w-3.5 h-3.5 rounded-full shrink-0 border border-white/20 shadow-xs"
@@ -3603,19 +3605,16 @@ export function MemoraBooth({
                           />
                           <div className="min-w-0 flex-1">
                             <div className="font-medium text-xs truncate leading-snug">{tpl.name}</div>
-                            <div className="text-[10px] font-mono text-cream/40 truncate">{tpl.badge}</div>
+                            <div className="text-[10px] font-mono text-cream/45 truncate">
+                              {tpl.badge} • {tpl.layout}
+                            </div>
                           </div>
-                          {!unlocked && (
-                            <span className="text-[10px] leading-none shrink-0" title="Locked - Preview only">
-                              🔒
-                            </span>
-                          )}
                         </button>
                       );
                     })}
                   </div>
 
-                  {sortedTemplates.length > 6 && (
+                  {unlockedTemplates.length > 6 && (
                     <div className="flex justify-center mt-2.5">
                       <button
                         type="button"
@@ -3645,8 +3644,7 @@ export function MemoraBooth({
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {LAYOUTS.map((item) => {
-                      const unlocked = isLayoutUnlocked(activePlanConfig, item.id);
+                    {unlockedLayouts.map((item) => {
                       const isSelected = layoutId === item.id;
 
                       return (
@@ -3656,21 +3654,12 @@ export function MemoraBooth({
                           onClick={() => setLayoutId(item.id)}
                           className={`relative flex items-center justify-center gap-1.5 rounded-2xl px-3.5 py-2.5 text-xs font-semibold transition-all cursor-pointer ${
                             isSelected
-                              ? !unlocked
-                                ? 'bg-amber-500/25 text-amber-200 border border-amber-500/60 shadow-md ring-2 ring-amber-500/50'
-                                : 'bg-primary text-primary-foreground shadow-md ring-2 ring-primary/40'
-                              : !unlocked
-                              ? 'opacity-65 bg-cream/5 text-cream/70 border border-white/5 hover:opacity-100 hover:bg-cream/10'
+                              ? 'bg-primary text-primary-foreground shadow-md ring-2 ring-primary/40'
                               : 'bg-cream/10 text-cream/70 hover:bg-cream/15'
                           }`}
-                          title={unlocked ? item.label : `${item.label} (Preview only - Locked in ${activePlanConfig.name})`}
+                          title={item.label}
                         >
                           <span>{item.label}</span>
-                          {!unlocked && (
-                            <span className="text-[10px] leading-none" title="Locked - Preview only">
-                              🔒
-                            </span>
-                          )}
                         </button>
                       );
                     })}
@@ -3701,44 +3690,18 @@ export function MemoraBooth({
 
                 {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
 
-                {/* Enable Camera Action or Locked Preview State */}
-                {!isShootable ? (
-                  <div className="flex flex-col gap-2.5 mt-1">
-                    <Link
-                      href="/dashboard/billing"
-                      className="rounded-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black py-4 px-4 text-sm font-bold shadow-lg transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2 text-center"
-                    >
-                      <Sparkles className="w-4 h-4 text-black shrink-0" />
-                      <span>Upgrade to {requiredTierName}</span>
-                    </Link>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const firstUnlockedLayout = LAYOUTS.find((l) => isLayoutUnlocked(activePlanConfig, l.id));
-                        if (firstUnlockedLayout) setLayoutId(firstUnlockedLayout.id);
-                        const firstUnlockedTemplate = allTemplates.find((t) => isTemplateUnlocked(activePlanConfig, t.id));
-                        if (firstUnlockedTemplate) setTemplateId(firstUnlockedTemplate.id);
-                      }}
-                      className="text-xs text-cream/60 hover:text-cream transition-colors py-1 cursor-pointer font-medium text-center"
-                    >
-                      Or switch to an included format to start camera
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (!isShootable) return;
-                      await startCamera();
-                      setPhase('shooting');
-                    }}
-                    disabled={status === 'requesting'}
-                    className="rounded-full bg-primary py-4 text-base font-semibold text-primary-foreground disabled:opacity-60 transition-opacity hover:opacity-95 cursor-pointer shadow-lg mt-1"
-                  >
-                    {status === 'requesting' ? 'Starting camera…' : 'Enable camera'}
-                  </button>
-                )}
+                {/* Enable Camera Action */}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await startCamera();
+                    setPhase('shooting');
+                  }}
+                  disabled={status === 'requesting'}
+                  className="rounded-full bg-primary py-4 text-base font-semibold text-primary-foreground disabled:opacity-60 transition-opacity hover:opacity-95 cursor-pointer shadow-lg mt-1"
+                >
+                  {status === 'requesting' ? 'Starting camera…' : 'Enable camera'}
+                </button>
               </div>
 
               {/* Right Column: Live Photo Strip Preview */}
@@ -3747,9 +3710,9 @@ export function MemoraBooth({
                   {/* Card Header */}
                   <div className="w-full flex items-center justify-between pb-3 mb-3 border-b border-white/10 text-[11px] font-mono">
                     <div className="flex items-center gap-2">
-                      <span className={`inline-block size-2 rounded-full ${!isShootable ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400 animate-pulse'}`} />
+                      <span className="inline-block size-2 rounded-full bg-emerald-400 animate-pulse" />
                       <span className="uppercase tracking-widest text-cream/70 font-medium">
-                        {!isShootable ? 'Preview Only' : 'Live Preview'}
+                        Live Preview
                       </span>
                     </div>
                     <span className="text-[10px] font-mono text-cream/40 uppercase tracking-wider">
@@ -3762,13 +3725,6 @@ export function MemoraBooth({
                     <span className="truncate">{selectedTemplate.name}</span>
                     <span className="text-primary font-medium shrink-0 ml-2">{activeLayout.label}</span>
                   </div>
-
-                  {!isShootable && (
-                    <div className="w-full mb-3 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-[11px] text-amber-300 font-medium">
-                      <Sparkles className="w-3.5 h-3.5 shrink-0 text-amber-400" />
-                      <span>Preview Only • Upgrade to {requiredTierName} to Unlock</span>
-                    </div>
-                  )}
 
                   {/* Photobooth Strip Canvas Container */}
                   <div className="w-full flex justify-center py-1">
@@ -4346,15 +4302,7 @@ export function MemoraBooth({
                             <div className="py-0.5 flex items-center justify-center">
                               <SchoolAcademicFooterIcon width={120} height={18} isLight={isSchoolLight} />
                             </div>
-                            {!isShootable ? (
-                              <div className="mt-1 flex items-center justify-center">
-                                <span
-                                  className="text-[6.5px] font-mono uppercase tracking-[0.2em] px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                                >
-                                  🔒 UPGRADE TO UNLOCK
-                                </span>
-                              </div>
-                            ) : activePlanConfig.watermark !== false ? (
+                            {activePlanConfig.watermark !== false ? (
                               <div className="mt-1 flex items-center justify-center">
                                 <span
                                   className="text-[6px] font-mono uppercase tracking-[0.2em] px-1.5 py-0.5 rounded-full"
@@ -4377,15 +4325,7 @@ export function MemoraBooth({
                             <div className="py-0.5 flex items-center justify-center">
                               <CoastalWaveFooterIcon width={120} height={16} />
                             </div>
-                            {!isShootable ? (
-                              <div className="mt-1 flex items-center justify-center">
-                                <span
-                                  className="text-[6.5px] font-mono uppercase tracking-[0.2em] px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                                >
-                                  🔒 UPGRADE TO UNLOCK
-                                </span>
-                              </div>
-                            ) : activePlanConfig.watermark !== false ? (
+                            {activePlanConfig.watermark !== false ? (
                               <div className="mt-1 flex items-center justify-center">
                                 <span
                                   className="text-[6px] font-mono uppercase tracking-[0.2em] px-1.5 py-0.5 rounded-full"
@@ -4408,15 +4348,7 @@ export function MemoraBooth({
                             <div className="py-0.5 flex items-center justify-center">
                               <PartyEqualizerFooterIcon width={120} height={16} />
                             </div>
-                            {!isShootable ? (
-                              <div className="mt-1 flex items-center justify-center">
-                                <span
-                                  className="text-[6.5px] font-mono uppercase tracking-[0.2em] px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                                >
-                                  🔒 UPGRADE TO UNLOCK
-                                </span>
-                              </div>
-                            ) : activePlanConfig.watermark !== false ? (
+                            {activePlanConfig.watermark !== false ? (
                               <div className="mt-1 flex items-center justify-center">
                                 <span
                                   className="text-[6px] font-mono uppercase tracking-[0.2em] px-1.5 py-0.5 rounded-full"
@@ -4439,15 +4371,7 @@ export function MemoraBooth({
                             <div className="py-0.5 flex items-center justify-center">
                               <WeddingBotanicalFooterIcon width={120} height={18} />
                             </div>
-                            {!isShootable ? (
-                              <div className="mt-1 flex items-center justify-center">
-                                <span
-                                  className="text-[6.5px] font-mono uppercase tracking-[0.2em] px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                                >
-                                  🔒 UPGRADE TO UNLOCK
-                                </span>
-                              </div>
-                            ) : activePlanConfig.watermark !== false ? (
+                            {activePlanConfig.watermark !== false ? (
                               <div className="mt-1 flex items-center justify-center">
                                 <span
                                   className="text-[6px] font-mono uppercase tracking-[0.2em] px-1.5 py-0.5 rounded-full"
@@ -4470,15 +4394,7 @@ export function MemoraBooth({
                             <div className="py-0.5 flex items-center justify-center">
                               <BirthdayBuntingFooterIcon width={120} height={18} />
                             </div>
-                            {!isShootable ? (
-                              <div className="mt-1 flex items-center justify-center">
-                                <span
-                                  className="text-[6.5px] font-mono uppercase tracking-[0.2em] px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                                >
-                                  🔒 UPGRADE TO UNLOCK
-                                </span>
-                              </div>
-                            ) : activePlanConfig.watermark !== false ? (
+                            {activePlanConfig.watermark !== false ? (
                               <div className="mt-1 flex items-center justify-center">
                                 <span
                                   className="text-[6px] font-mono uppercase tracking-[0.2em] px-1.5 py-0.5 rounded-full"
@@ -4501,15 +4417,7 @@ export function MemoraBooth({
                             <div className="py-0.5 flex items-center justify-center">
                               <CorporateSkylineFooterIcon width={120} height={18} />
                             </div>
-                            {!isShootable ? (
-                              <div className="mt-1 flex items-center justify-center">
-                                <span
-                                  className="text-[6.5px] font-mono uppercase tracking-[0.2em] px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                                >
-                                  🔒 UPGRADE TO UNLOCK
-                                </span>
-                              </div>
-                            ) : activePlanConfig.watermark !== false ? (
+                            {activePlanConfig.watermark !== false ? (
                               <div className="mt-1 flex items-center justify-center">
                                 <span
                                   className="text-[6px] font-mono uppercase tracking-[0.2em] px-1.5 py-0.5 rounded-full"
@@ -4532,15 +4440,7 @@ export function MemoraBooth({
                             <div className="py-0.5 flex items-center justify-center">
                               <GraduationDiplomaFooterIcon width={120} height={18} />
                             </div>
-                            {!isShootable ? (
-                              <div className="mt-1 flex items-center justify-center">
-                                <span
-                                  className="text-[6.5px] font-mono uppercase tracking-[0.2em] px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                                >
-                                  🔒 UPGRADE TO UNLOCK
-                                </span>
-                              </div>
-                            ) : activePlanConfig.watermark !== false ? (
+                            {activePlanConfig.watermark !== false ? (
                               <div className="mt-1 flex items-center justify-center">
                                 <span
                                   className="text-[6px] font-mono uppercase tracking-[0.2em] px-1.5 py-0.5 rounded-full"
@@ -4567,15 +4467,7 @@ export function MemoraBooth({
                             <p className="text-[8px] font-mono opacity-65 tracking-wider mt-0.5">
                               {activeLayout.shots} {activeLayout.shots === 1 ? 'Pose' : 'Poses'} • {activeLayout.label}
                             </p>
-                            {!isShootable ? (
-                              <div className="mt-1 flex items-center justify-center">
-                                <span
-                                  className="text-[6.5px] font-mono uppercase tracking-[0.2em] px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                                >
-                                  🔒 UPGRADE TO UNLOCK
-                                </span>
-                              </div>
-                            ) : activePlanConfig.watermark !== false ? (
+                            {activePlanConfig.watermark !== false ? (
                               <div className="mt-1 flex items-center justify-center">
                                 <span
                                   className="text-[6px] font-mono uppercase tracking-[0.2em] px-1.5 py-0.5 rounded-full"

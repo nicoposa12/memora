@@ -1,5 +1,5 @@
 import { Metadata } from 'next';
-import { MemoraBooth } from '@/features/booth/components/MemoraBooth';
+import { BoothClient } from './BoothClient';
 
 export const metadata: Metadata = {
   title: 'Memora Photobooth — snap your strip',
@@ -9,7 +9,8 @@ export const metadata: Metadata = {
 export default function BoothPage() {
   return (
     <main>
-      <MemoraBooth eventName="Memora Booth" eventSubtitle="Try it now" exitHref="/" />
+      <BoothClient />
     </main>
   );
 }
+
