@@ -153,7 +153,7 @@ function AuthForm() {
         </div>
 
         {/* Segmented Mode Switcher */}
-        <div className="grid grid-cols-2 p-1 rounded-full bg-secondary border border-border/60 mb-6 text-xs font-mono uppercase tracking-[0.15em]">
+        <div className="grid grid-cols-2 p-1 rounded-xl bg-secondary/60 border border-border/50 mb-5 text-xs font-mono uppercase tracking-[0.14em]">
           <button
             type="button"
             onClick={() => {
@@ -161,9 +161,9 @@ function AuthForm() {
               setError(null);
               setSuccessMessage(null);
             }}
-            className={`py-2 rounded-full transition-all cursor-pointer text-center font-medium ${
+            className={`py-2 rounded-lg transition-all duration-150 cursor-pointer text-center font-medium ${
               mode === 'login'
-                ? 'bg-foreground text-background shadow-xs font-bold'
+                ? 'bg-card text-[#e44317] shadow-xs font-bold'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -176,9 +176,9 @@ function AuthForm() {
               setError(null);
               setSuccessMessage(null);
             }}
-            className={`py-2 rounded-full transition-all cursor-pointer text-center font-medium ${
+            className={`py-2 rounded-lg transition-all duration-150 cursor-pointer text-center font-medium ${
               mode === 'register'
-                ? 'bg-foreground text-background shadow-xs font-bold'
+                ? 'bg-card text-[#e44317] shadow-xs font-bold'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -188,14 +188,14 @@ function AuthForm() {
 
         {/* Feedback Notifications */}
         {error && (
-          <div className="mb-4 p-3.5 rounded-2xl bg-destructive/10 border border-destructive/25 text-destructive text-xs flex items-center gap-2.5 animate-in fade-in">
+          <div className="mb-4 p-3.5 rounded-xl bg-destructive/10 border border-destructive/25 text-destructive text-xs flex items-center gap-2.5 animate-in fade-in">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
         {successMessage && (
-          <div className="mb-4 p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-400 text-xs flex items-center gap-2.5 animate-in fade-in">
+          <div className="mb-4 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-400 text-xs flex items-center gap-2.5 animate-in fade-in">
             <CheckCircle2 className="w-4 h-4 shrink-0" />
             <span>{successMessage}</span>
           </div>
@@ -206,12 +206,12 @@ function AuthForm() {
           type="button"
           onClick={handleGoogleSignIn}
           disabled={isGoogleLoading || isLoading}
-          className="w-full py-2.5 px-4 rounded-full border border-border/80 bg-background hover:bg-secondary/60 text-foreground text-xs font-medium tracking-wide transition-all shadow-xs flex items-center justify-center gap-3 cursor-pointer active:scale-[0.99] disabled:opacity-50"
+          className="w-full h-11 px-4 rounded-xl border border-border/80 bg-card hover:bg-secondary/50 hover:border-foreground/30 text-foreground text-xs sm:text-[13px] font-medium tracking-normal transition-all shadow-xs hover:shadow-sm flex items-center justify-center gap-3 cursor-pointer active:scale-[0.99] disabled:opacity-50"
         >
           {isGoogleLoading ? (
             <div className="w-4 h-4 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
           ) : (
-            <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+            <svg className="w-[18px] h-[18px] shrink-0" viewBox="0 0 24 24">
               <path
                 fill="#4285F4"
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -230,15 +230,16 @@ function AuthForm() {
               />
             </svg>
           )}
-          <span>Continue with Google</span>
+          <span className="text-foreground font-medium">Continue with Google</span>
         </button>
 
-        {/* Minimalist Divider */}
-        <div className="relative my-5 flex items-center justify-center">
-          <div className="border-t border-border/60 w-full" />
-          <span className="bg-card px-3 text-[11px] font-mono uppercase tracking-[0.15em] text-muted-foreground shrink-0">
-            or
+        {/* Minimalist Symmetrical Divider */}
+        <div className="relative my-6 flex items-center">
+          <div className="flex-1 border-t border-border/50" />
+          <span className="px-3 shrink-0 text-xs text-muted-foreground font-normal">
+            or continue with email
           </span>
+          <div className="flex-1 border-t border-border/50" />
         </div>
 
         {/* Auth Form */}
@@ -256,7 +257,7 @@ function AuthForm() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Eleanor Vance"
-                  className="w-full pl-10 pr-4 py-2.5 bg-background border border-border/80 focus:border-primary focus:ring-1 focus:ring-primary rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 transition-all outline-none"
+                  className="w-full pl-10 pr-4 py-2.5 bg-background border border-border/80 focus:border-[#f4623a]/80 focus:ring-2 focus:ring-[#f4623a]/15 rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 transition-all outline-none"
                 />
               </div>
             </div>
@@ -274,7 +275,7 @@ function AuthForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@company.com"
-                className="w-full pl-10 pr-4 py-2.5 bg-background border border-border/80 focus:border-primary focus:ring-1 focus:ring-primary rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 transition-all outline-none"
+                className="w-full pl-10 pr-4 py-2.5 bg-background border border-border/80 focus:border-[#f4623a]/80 focus:ring-2 focus:ring-[#f4623a]/15 rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 transition-all outline-none"
               />
             </div>
           </div>
@@ -288,7 +289,7 @@ function AuthForm() {
                 <button
                   type="button"
                   onClick={() => setError("Password reset instructions have been sent if this account exists.")}
-                  className="text-xs text-primary hover:underline cursor-pointer"
+                  className="text-xs text-[#e44317] hover:underline cursor-pointer"
                 >
                   Forgot password?
                 </button>
@@ -303,7 +304,7 @@ function AuthForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pl-10 pr-10 py-2.5 bg-background border border-border/80 focus:border-primary focus:ring-1 focus:ring-primary rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 transition-all outline-none"
+                className="w-full pl-10 pr-10 py-2.5 bg-background border border-border/80 focus:border-[#f4623a]/80 focus:ring-2 focus:ring-[#f4623a]/15 rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 transition-all outline-none"
               />
               <button
                 type="button"
@@ -330,7 +331,7 @@ function AuthForm() {
                   value={passwordConfirmation}
                   onChange={(e) => setPasswordConfirmation(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-4 py-2.5 bg-background border border-border/80 focus:border-primary focus:ring-1 focus:ring-primary rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 transition-all outline-none"
+                  className="w-full pl-10 pr-4 py-2.5 bg-background border border-border/80 focus:border-[#f4623a]/80 focus:ring-2 focus:ring-[#f4623a]/15 rounded-xl text-sm text-foreground placeholder:text-muted-foreground/60 transition-all outline-none"
                 />
               </div>
             </div>
@@ -343,7 +344,7 @@ function AuthForm() {
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="w-4 h-4 rounded border-border/80 text-primary focus:ring-primary accent-primary cursor-pointer"
+                className="w-4 h-4 rounded border-border text-[#e44317] focus:ring-[#f4623a]/30 accent-[#e44317] cursor-pointer"
               />
               <label htmlFor="remember" className="text-xs text-muted-foreground select-none cursor-pointer">
                 Keep me signed in for 30 days
@@ -351,15 +352,15 @@ function AuthForm() {
             </div>
           )}
 
-          {/* Submit Button in Memora Primary Style */}
+          {/* Submit Button in Memora Signature Logo Coral Gradient Style */}
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-3 mt-3 rounded-full bg-primary text-primary-foreground font-mono text-xs uppercase tracking-[0.2em] font-medium hover:bg-primary/90 transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2 active:scale-[0.99] disabled:opacity-50"
+            className="w-full h-11 mt-3 rounded-xl bg-gradient-to-r from-[#f4623a] to-[#e44317] hover:from-[#ea552d] hover:to-[#d6380d] text-white font-medium text-xs tracking-wider uppercase transition-all shadow-xs hover:shadow cursor-pointer flex items-center justify-center gap-2 active:scale-[0.99] disabled:opacity-50"
           >
             {isLoading ? (
               <span className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 <span>Processing...</span>
               </span>
             ) : (
@@ -380,7 +381,7 @@ function AuthForm() {
                 <button
                   type="button"
                   onClick={() => setMode('register')}
-                  className="text-primary font-medium hover:underline cursor-pointer ml-1"
+                  className="text-[#e44317] font-medium hover:underline cursor-pointer ml-1"
                 >
                   Create an account
                 </button>
@@ -391,7 +392,7 @@ function AuthForm() {
                 <button
                   type="button"
                   onClick={() => setMode('login')}
-                  className="text-primary font-medium hover:underline cursor-pointer ml-1"
+                  className="text-[#e44317] font-medium hover:underline cursor-pointer ml-1"
                 >
                   Sign in
                 </button>
