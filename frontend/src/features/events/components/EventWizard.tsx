@@ -87,6 +87,124 @@ export function EventWizard() {
   ];
 
   if (!isCheckingLimit && limitStatus && !limitStatus.allowed) {
+    if (limitStatus.currentCount === 0) {
+      return (
+        <div className="w-full max-w-3xl mx-auto py-8 px-4 selection:bg-primary/20 selection:text-primary animate-in fade-in duration-300">
+          <div className="text-center space-y-3 mb-8">
+            <h2 className="font-display text-3xl sm:text-4xl font-light text-foreground tracking-tight">
+              CHOOSE A PLAN TO CREATE YOUR EVENT
+            </h2>
+            <p className="text-xs sm:text-sm text-muted-foreground font-light max-w-lg mx-auto leading-relaxed">
+              Memora photobooth experiences require an active event pass or workspace subscription. Select the option that best fits your event.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* PRO Single Event Pass */}
+            <div className="bg-card rounded-3xl p-6 sm:p-7 border border-border/80 shadow-xs flex flex-col justify-between space-y-6 hover:border-primary/40 transition-all">
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <h3 className="font-display text-2xl font-normal text-foreground">
+                    PRO EVENT PASS
+                  </h3>
+                  <p className="text-xs text-muted-foreground font-light">
+                    Single event pass for weddings, birthdays, and parties.
+                  </p>
+                </div>
+
+                <div className="pt-2">
+                  <span className="font-display text-3xl text-foreground font-light">₱1,499</span>
+                  <span className="text-xs font-mono text-muted-foreground ml-2">/ event</span>
+                </div>
+
+                <ul className="space-y-2.5 pt-3 text-xs text-muted-foreground border-t border-border/60">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span>1 dedicated event photobooth</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span>Unlimited guest photos & downloads</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span>No Memora watermark</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span>Instant QR code venue sharing</span>
+                  </li>
+                </ul>
+              </div>
+
+              <Link
+                href="/checkout/pro"
+                className="w-full py-3 px-5 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-mono text-xs uppercase tracking-[0.14em] font-medium transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer text-center"
+              >
+                <span>Select PRO Pass</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
+            {/* STUDIO Workspace */}
+            <div className="bg-card rounded-3xl p-6 sm:p-7 border border-border/80 shadow-xs flex flex-col justify-between space-y-6 hover:border-primary/40 transition-all">
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <h3 className="font-display text-2xl font-normal text-foreground">
+                    STUDIO WORKSPACE
+                  </h3>
+                  <p className="text-xs text-muted-foreground font-light">
+                    Monthly subscription for event organizers and agencies.
+                  </p>
+                </div>
+
+                <div className="pt-2">
+                  <span className="font-display text-3xl text-foreground font-light">₱4,999</span>
+                  <span className="text-xs font-mono text-muted-foreground ml-2">/ month</span>
+                </div>
+
+                <ul className="space-y-2.5 pt-3 text-xs text-muted-foreground border-t border-border/60">
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span>Unlimited concurrent events</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span>Custom studio watermark & logo</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span>Team & multi-operator access</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="w-3.5 h-3.5 text-primary shrink-0" />
+                    <span>Priority photo processing & vault</span>
+                  </li>
+                </ul>
+              </div>
+
+              <Link
+                href="/checkout/studio"
+                className="w-full py-3 px-5 rounded-full bg-foreground hover:bg-foreground/90 text-background font-mono text-xs uppercase tracking-[0.14em] font-medium transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer text-center"
+              >
+                <span>Start Studio Subscription</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+
+          <div className="text-center mt-6">
+            <Link
+              href="/dashboard/events"
+              className="text-xs font-mono uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Return to events
+            </Link>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="w-full max-w-2xl mx-auto py-8 px-4 selection:bg-primary/20 selection:text-primary">
         <div className="bg-card rounded-3xl p-6 sm:p-10 border border-border/80 shadow-xs ring-1 ring-border/30 text-foreground text-center space-y-6 animate-in fade-in duration-300">

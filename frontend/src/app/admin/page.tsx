@@ -23,6 +23,7 @@ import {
   getRealBooths, 
   saveRealBooths, 
   getRealCustomers, 
+  fetchBackendCustomers,
   getRealTransactions, 
   getRealTotalPhotos,
   recordRealAuditLog,
@@ -42,7 +43,7 @@ export default function AdminDashboardPage() {
   const [totalPhotos, setTotalPhotos] = useState<number>(0);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  const loadAdminData = React.useCallback(() => {
+  const loadAdminData = React.useCallback(async () => {
     const booths = getRealBooths();
     const custs = getRealCustomers().filter(c => !isAdminRecord(c));
     const txs = getRealTransactions().filter(t => !isAdminHostName(t.host));
@@ -53,10 +54,19 @@ export default function AdminDashboardPage() {
     setTransactions(txs);
     setTotalPhotos(photos);
     setIsLoaded(true);
+
+    try {
+      const fresh = await fetchBackendCustomers();
+      if (Array.isArray(fresh)) {
+        setCustomers(fresh.filter(c => !isAdminRecord(c)));
+      }
+    } catch {}
   }, []);
 
   useEffect(() => {
     loadAdminData();
+    const interval = setInterval(loadAdminData, 4000);
+    return () => clearInterval(interval);
   }, [loadAdminData]);
 
   // Realtime subscription: live sync admin metrics on captures, events, booth updates

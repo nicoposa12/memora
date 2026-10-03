@@ -27,6 +27,8 @@ import { Logo } from '@/components/Logo';
 import { isClientRole, isAdminRole, getRoleDisplayName, UserRole, ClientPlan } from '@/types/user';
 import { getScopedEvents } from '@/lib/userEvents';
 import { formatFirstName } from '@/lib/utils';
+import { apiClient } from '@/lib/api';
+import { useRealtime } from '@/context/RealtimeContext';
 
 interface DashboardSidebarProps {
   onCloseMobile?: () => void;
@@ -52,7 +54,7 @@ export function DashboardSidebar({ onCloseMobile }: DashboardSidebarProps) {
   const [userName, setUserName] = useState('Studio Organizer');
   const [userEmail, setUserEmail] = useState('');
   const [userRole, setUserRole] = useState<UserRole>('client');
-  const [userPlan, setUserPlan] = useState<ClientPlan>('event');
+  const [userPlan, setUserPlan] = useState<ClientPlan>('free');
   const [firstEventSlug, setFirstEventSlug] = useState<string | null>(null);
 
   const loadUserData = () => {
@@ -64,7 +66,16 @@ export function DashboardSidebar({ onCloseMobile }: DashboardSidebarProps) {
         else if (parsed.name) setUserName(formatFirstName(parsed));
         if (parsed.email) setUserEmail(parsed.email);
         if (parsed.role) setUserRole(parsed.role);
-        if (parsed.plan) setUserPlan(parsed.plan);
+        
+        const hasStudio = parsed.subscription_plan === 'studio' && parsed.subscription_status === 'active';
+        const hasPro = parsed.plan === 'pro';
+        if (hasStudio) {
+          setUserPlan('studio');
+        } else if (hasPro) {
+          setUserPlan('pro');
+        } else {
+          setUserPlan('free');
+        }
       }
     } catch {
       // fallback defaults
@@ -78,12 +89,95 @@ export function DashboardSidebar({ onCloseMobile }: DashboardSidebarProps) {
         setFirstEventSlug(null);
       }
     } catch {}
+
+    // Verify and sync authentic plan with backend to prevent client-side bypasses
+    if (typeof window !== 'undefined' && localStorage.getItem('memora_token')) {
+      apiClient.get('/auth/me')
+        .then((res) => {
+          const me = res.data?.user;
+          if (!me) return;
+
+          if (me.subscription_status === 'suspended') {
+            localStorage.removeItem('memora_token');
+            localStorage.removeItem('memora_user');
+            window.location.href = '/login?error=' + encodeURIComponent('Your account has been suspended. Please contact support.');
+            return;
+          }
+
+          const adminUser = isAdminRole(me.role) || me.role === 'admin';
+          const hasStudio = me.subscription_plan === 'studio' && (me.subscription_status === 'active' || me.subscription_status === 'past_due');
+          const hasPro = me.subscription_plan === 'pro';
+          const realPlan: ClientPlan = adminUser ? 'studio' : hasStudio ? 'studio' : hasPro ? 'pro' : 'free';
+
+          setUserPlan(realPlan);
+          if (me.role) setUserRole(me.role);
+          if (me.name) setUserName(formatFirstName(me));
+          if (me.email) setUserEmail(me.email);
+
+          const raw = localStorage.getItem('memora_user');
+          const parsed = raw ? JSON.parse(raw) : {};
+          parsed.role = me.role;
+          parsed.subscription_plan = me.subscription_plan;
+          parsed.subscription_status = me.subscription_status;
+          parsed.subscription_expires_at = me.subscription_expires_at;
+          parsed.subscription_grace_until = me.subscription_grace_until;
+          parsed.plan = realPlan;
+          localStorage.setItem('memora_user', JSON.stringify(parsed));
+        })
+        .catch((err) => {
+          const status = err.response?.status;
+          const msg = err.message || '';
+          if (status === 401 || msg.includes('Unauthenticated') || msg.includes('session is no longer active')) {
+            localStorage.removeItem('memora_token');
+            localStorage.removeItem('memora_user');
+            window.location.href = '/login?error=' + encodeURIComponent('This account has been removed. Please authenticate again.');
+          } else if (status === 403 && msg.toLowerCase().includes('suspended')) {
+            localStorage.removeItem('memora_token');
+            localStorage.removeItem('memora_user');
+            window.location.href = '/login?error=' + encodeURIComponent('Your account has been suspended. Please contact support.');
+          }
+        });
+    }
   };
+
+  useRealtime(['USER_UPDATED'], (msg) => {
+    try {
+      const stored = localStorage.getItem('memora_user');
+      if (!stored) return;
+      const parsed = JSON.parse(stored);
+      const myEmail = (parsed.email || '').toLowerCase().trim();
+      const payloadEmail = (msg.payload?.email || '').toLowerCase().trim();
+      const payloadId = String(msg.payload?.id || '').replace(/\D/g, '');
+      const myId = String(parsed.id || '').replace(/\D/g, '');
+
+      const isMe = (payloadEmail && payloadEmail === myEmail) || (payloadId && myId && payloadId === myId);
+
+      if (isMe) {
+        if (msg.payload?.type === 'deleted') {
+          localStorage.removeItem('memora_token');
+          localStorage.removeItem('memora_user');
+          window.location.href = '/login?error=' + encodeURIComponent('This account has been deleted by an administrator. Please authenticate again.');
+          return;
+        }
+        if (msg.payload?.status === 'suspended') {
+          localStorage.removeItem('memora_token');
+          localStorage.removeItem('memora_user');
+          window.location.href = '/login?error=' + encodeURIComponent('Your account has been suspended. Please contact support.');
+          return;
+        }
+        loadUserData();
+      }
+    } catch {}
+  });
 
   useEffect(() => {
     loadUserData();
+    const interval = setInterval(loadUserData, 3000);
     window.addEventListener('storage', loadUserData);
-    return () => window.removeEventListener('storage', loadUserData);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', loadUserData);
+    };
   }, []);
 
   const handleLogout = () => {
@@ -174,8 +268,7 @@ export function DashboardSidebar({ onCloseMobile }: DashboardSidebarProps) {
           label: 'Billing & Plan',
           href: '/dashboard/billing',
           icon: Crown,
-          badge: isAdminRole(userRole) ? null : (userPlan === 'studio' ? 'Studio' : 'Pro'),
-          badgeColor: 'gold',
+          badge: null,
         },
       ],
     },
@@ -206,12 +299,14 @@ export function DashboardSidebar({ onCloseMobile }: DashboardSidebarProps) {
               <span className="font-display text-2xl tracking-[0.1em] font-normal text-foreground group-hover:text-primary transition-colors">
                 MEMORA
               </span>
-              <span className="px-2 py-0.5 rounded-full text-[9px] font-mono uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 font-medium">
-                {isAdminRole(userRole) ? 'ADMIN' : 'STUDIO'}
-              </span>
+              {isAdminRole(userRole) && (
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-mono uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 font-medium">
+                  ADMIN
+                </span>
+              )}
             </div>
             <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-muted-foreground/80">
-              {isAdminRole(userRole) ? 'Admin Portal' : 'Event Studio'}
+              {isAdminRole(userRole) ? 'Admin Portal' : 'Event Workspace'}
             </p>
           </div>
         </Link>
@@ -277,24 +372,6 @@ export function DashboardSidebar({ onCloseMobile }: DashboardSidebarProps) {
           </div>
         ))}
 
-        {/* Live Booth Badge Card */}
-        <div className="px-1 pt-2">
-          <div className="p-3.5 rounded-2xl bg-secondary/40 border border-border/60 flex items-center gap-3">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-mono uppercase tracking-widest text-foreground font-semibold truncate">
-                Live Camera Service
-              </p>
-              <p className="text-[10px] text-muted-foreground truncate">
-                System Online & Ready
-              </p>
-            </div>
-          </div>
-        </div>
-
         {/* Differentiated Role Display: System Admin (Admin Only) vs Event Organizer Features */}
         {isAdminRole(userRole) ? (
           <div className="px-1 pt-1">
@@ -327,28 +404,25 @@ export function DashboardSidebar({ onCloseMobile }: DashboardSidebarProps) {
           <div className="px-1 pt-1">
             <div className="p-3.5 rounded-2xl bg-secondary/40 border border-border/70 space-y-2.5">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono uppercase tracking-widest text-primary font-semibold flex items-center gap-1">
-                  <Sparkles className="w-3 h-3" />
-                  <span>
-                    {userPlan === 'studio' ? 'STUDIO Active' : (userPlan === 'pro' || userPlan === 'event') ? 'PRO Active' : 'Free Trial'}
-                  </span>
+                <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground font-semibold">
+                  {userPlan === 'studio' ? 'STUDIO Active' : userPlan === 'pro' ? 'PRO Active' : 'Free Account'}
                 </span>
-                <span className="text-[9px] font-mono text-muted-foreground">
-                  {isAdminRole(userRole) ? 'Unlimited (Admin)' : userPlan === 'free' ? '3 Test Strips' : 'Unlimited'}
-                </span>
+                {userPlan !== 'free' && (
+                  <span className="text-[9px] font-mono text-muted-foreground">Unlimited</span>
+                )}
               </div>
               <p className="text-[10px] text-muted-foreground leading-relaxed">
                 {userPlan === 'free' 
-                  ? 'Upgrade to Pro for unlimited guest photos and no watermarks.'
+                  ? 'Purchase an event pass or monthly studio plan to host events.'
                   : userPlan === 'studio'
-                  ? 'Studio plan active: all events covered with no watermarks.'
-                  : 'Pro active: unlimited photos and no watermark.'}
+                  ? 'All events covered under your active Studio workspace.'
+                  : 'Pro active for your event with zero watermark.'}
               </p>
               <Link
                 href="/dashboard/billing"
                 className="w-full py-2 px-3 rounded-full bg-foreground text-background hover:bg-foreground/90 font-mono text-[10px] uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer font-medium"
               >
-                <span>{userPlan === 'free' ? 'Upgrade to Pro (₱1,499)' : 'Manage Subscription'}</span>
+                <span>{userPlan === 'free' ? 'Choose Plan' : 'Manage Subscription'}</span>
                 <ArrowRight className="w-3 h-3 stroke-[2.5]" />
               </Link>
             </div>

@@ -147,6 +147,23 @@ class CheckoutController extends Controller
             }
 
             $user = $request->user() ?? ($payment ? User::find($payment->user_id) : null);
+
+            // Plan confirmation security: non-admins must have a valid payment record
+            if (!$payment && !$user?->isAdmin()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'A valid transaction record or invoice is required to activate this plan.',
+                ], 403);
+            }
+
+            // Ensure non-admins can only confirm their own payments
+            if ($payment && $user && !$user->isAdmin() && $payment->user_id && $payment->user_id != $user->id) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized payment transaction.',
+                ], 403);
+            }
+
             $planType = $validated['plan_type'] ?? ($payment?->amount >= 4000 ? 'studio' : 'pro');
             $eventId = $validated['event_id'] ?? $payment?->event_id;
 

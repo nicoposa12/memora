@@ -60,7 +60,6 @@ export default function EventOrganizerEventsPage() {
   const [selectedQrEvent, setSelectedQrEvent] = useState<{ name: string; slug: string } | null>(null);
   const [editingEvent, setEditingEvent] = useState<PhotoboothEvent | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [isUpgradingId, setIsUpgradingId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [limitStatus, setLimitStatus] = useState<EventLimitStatus | null>(null);
 
@@ -126,53 +125,6 @@ export default function EventOrganizerEventsPage() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const handleUpgradeEventToPro = (event: PhotoboothEvent) => {
-    setIsUpgradingId(event.id);
-    setTimeout(() => {
-      setEvents(prev => {
-        const next = prev.map(e =>
-          e.id === event.id
-            ? { ...e, plan: 'pro' as const, price: isAdmin ? '₱0 (Admin)' : '₱1,499', paymentStatus: 'PAID' as const }
-            : e
-        );
-        try {
-          const storedEvents = localStorage.getItem('memora_events');
-          if (storedEvents) {
-            const rawList = JSON.parse(storedEvents);
-            const updatedRaw = rawList.map((item: any) =>
-              item.id === event.id || item.slug === event.slug
-                ? { ...item, plan: 'pro', isPremium: true, price: isAdmin ? '₱0 (Admin)' : '₱1,499', paymentStatus: 'PAID' }
-                : item
-            );
-            localStorage.setItem('memora_events', JSON.stringify(updatedRaw));
-          }
-        } catch {}
-        return next;
-      });
-
-      // Record transaction in admin ledger
-      try {
-        const { recordRealTransaction } = require('@/lib/adminRecords');
-        recordRealTransaction({
-          host: 'System Admin',
-          event: event.name,
-          plan: isAdmin ? 'PRO Event Pass (Admin Complimentary - ₱0)' : 'PRO Event Pass (₱1,499)',
-          amount: isAdmin ? '₱0.00' : '₱1,499.00',
-          amountNum: isAdmin ? 0 : 1499,
-          status: 'Paid',
-          method: isAdmin ? 'Admin Complimentary Grant' : 'GCash Instant',
-        });
-        broadcastRealtime('EVENT_UPDATED', { id: event.id, plan: 'pro' });
-      } catch {}
-
-      setIsUpgradingId(null);
-      showToast(
-        isAdmin 
-          ? `Success! "${event.name}" upgraded to PRO (₱0 Free Admin Grant). Unlimited photos & zero watermark active!`
-          : `Success! "${event.name}" upgraded to PRO (₱1,499). Unlimited photos & zero watermark active!`
-      );
-    }, 300);
-  };
 
   const handleToggleArchive = (id: string) => {
     setEvents(prev => {
@@ -445,14 +397,12 @@ export default function EventOrganizerEventsPage() {
                   ) : (
                     <div className="flex items-center justify-between">
                       <span className="text-muted-foreground">Includes Memora watermark</span>
-                      <button
-                        type="button"
-                        disabled={isUpgradingId === event.id}
-                        onClick={() => handleUpgradeEventToPro(event)}
+                      <Link
+                        href={`/checkout/pro?name=${encodeURIComponent(event.name)}&date=${encodeURIComponent(event.date)}&type=${encodeURIComponent(event.slug)}`}
                         className="px-3 py-1 rounded-full bg-secondary hover:bg-foreground hover:text-background text-foreground border border-border/80 font-mono text-[10px] uppercase font-semibold transition-all cursor-pointer"
                       >
-                        {isUpgradingId === event.id ? 'Upgrading...' : isAdmin ? 'Upgrade to Pro (Free)' : 'Upgrade PRO (₱1,499)'}
-                      </button>
+                        {isAdmin ? 'Upgrade to Pro (Free)' : 'Upgrade PRO (₱1,499)'}
+                      </Link>
                     </div>
                   )}
                 </div>

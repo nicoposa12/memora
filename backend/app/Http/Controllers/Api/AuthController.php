@@ -41,6 +41,10 @@ class AuthController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->role,
+                'subscription_plan' => $user->subscription_plan,
+                'subscription_status' => $user->subscription_status,
+                'subscription_expires_at' => $user->subscription_expires_at,
+                'subscription_grace_until' => $user->subscription_grace_until,
                 'has_2fa' => $user->hasTwoFactorEnabled(),
             ],
         ], 201);
@@ -65,6 +69,20 @@ class AuthController extends Controller
             ]);
         }
 
+        if ($user->subscription_status === 'suspended') {
+            AuditService::record(
+                action: 'auth.login_blocked_suspended',
+                status: 'warning',
+                userId: $user->id,
+                payload: ['email' => $user->email],
+                request: $request
+            );
+
+            throw ValidationException::withMessages([
+                'email' => ['Your account has been suspended. Please contact support.'],
+            ]);
+        }
+
         $token = $user->createToken('auth_token', ['role:' . $user->role])->plainTextToken;
 
         AuditService::record(
@@ -82,6 +100,10 @@ class AuthController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->role,
+                'subscription_plan' => $user->subscription_plan,
+                'subscription_status' => $user->subscription_status,
+                'subscription_expires_at' => $user->subscription_expires_at,
+                'subscription_grace_until' => $user->subscription_grace_until,
                 'has_2fa' => $user->hasTwoFactorEnabled(),
             ],
         ]);
@@ -111,12 +133,23 @@ class AuthController extends Controller
     {
         $user = $request->user();
 
+        if ($user && $user->subscription_status === 'suspended') {
+            $user->tokens()->delete();
+            return response()->json([
+                'message' => 'Your account has been suspended. Please contact support.',
+            ], 403);
+        }
+
         return response()->json([
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->role,
+                'subscription_plan' => $user->subscription_plan,
+                'subscription_status' => $user->subscription_status,
+                'subscription_expires_at' => $user->subscription_expires_at,
+                'subscription_grace_until' => $user->subscription_grace_until,
                 'has_2fa' => $user->hasTwoFactorEnabled(),
             ],
         ]);

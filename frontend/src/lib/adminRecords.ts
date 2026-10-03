@@ -357,6 +357,115 @@ export function createRealCustomer(record: Omit<RealCustomerRecord, 'id' | 'join
   return newCustomer;
 }
 
+/**
+ * Synchronize or register an active user into real customer records.
+ */
+export function createOrUpdateCustomerFromUser(user: any): RealCustomerRecord | null {
+  if (!user || isAdminRecord(user) || !user.email) return null;
+  const current = getRealCustomers();
+  const existingIndex = current.findIndex(c => c.email.toLowerCase() === user.email.toLowerCase());
+
+  const tier = user.subscription_plan === 'studio' 
+    ? 'Studio Pro' 
+    : user.subscription_plan === 'pro' || user.plan === 'pro' 
+    ? 'Event Pass' 
+    : 'Free Trial';
+
+  if (existingIndex >= 0) {
+    current[existingIndex] = {
+      ...current[existingIndex],
+      name: user.name || current[existingIndex].name,
+      role: user.role || current[existingIndex].role,
+      tier: tier,
+      status: user.subscription_status === 'suspended' ? 'suspended' : 'active',
+      subscriptionExpiresAt: user.subscription_expires_at || current[existingIndex].subscriptionExpiresAt,
+      subscriptionGraceUntil: user.subscription_grace_until || current[existingIndex].subscriptionGraceUntil,
+    };
+    saveRealCustomers(current);
+    return current[existingIndex];
+  } else {
+    const newCustomer: RealCustomerRecord = {
+      id: user.id ? `USR-${user.id}` : `USR-${Math.floor(1000 + Math.random() * 9000)}`,
+      name: user.name || 'Organizer',
+      email: user.email,
+      studioName: `${user.name || 'Organizer'}'s Studio`,
+      role: user.role || 'organizer',
+      tier: tier,
+      activeEvents: 0,
+      totalPhotos: 0,
+      storageMb: 0,
+      status: 'active',
+      joinedDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      subscriptionExpiresAt: user.subscription_expires_at,
+      subscriptionGraceUntil: user.subscription_grace_until,
+      billingCycle: tier === 'Studio Pro' ? 'monthly' : tier === 'Event Pass' ? 'per_event' : 'none',
+      renewalStatus: 'active',
+    };
+    current.unshift(newCustomer);
+    saveRealCustomers(current);
+    return newCustomer;
+  }
+}
+
+/**
+ * Fetch registered users directly from backend PostgreSQL database.
+ */
+export async function fetchBackendCustomers(): Promise<RealCustomerRecord[]> {
+  if (typeof window === 'undefined') return [];
+  try {
+    const { apiClient } = require('@/lib/api');
+    const res = await apiClient.get('/admin/users');
+    const users: any[] = res.data?.users || [];
+    if (!Array.isArray(users)) return getRealCustomers();
+
+    const current = getRealCustomers();
+    const mapped: RealCustomerRecord[] = users
+      .filter((u) => !isAdminRecord(u) && !isSampleCustomer(u))
+      .map((u) => {
+        const existing = current.find((c) => c.email.toLowerCase() === u.email.toLowerCase());
+        const tier = u.subscription_plan === 'studio' 
+          ? 'Studio Pro' 
+          : u.subscription_plan === 'pro' 
+          ? 'Event Pass' 
+          : 'Free Trial';
+
+        const joinedDate = u.created_at
+          ? new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+          : (existing?.joinedDate || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }));
+
+        return {
+          id: `USR-${u.id}`,
+          name: u.name,
+          email: u.email,
+          studioName: existing?.studioName || `${u.name}'s Studio`,
+          role: u.role || 'organizer',
+          tier: tier,
+          activeEvents: u.events_count ?? existing?.activeEvents ?? 0,
+          totalPhotos: existing?.totalPhotos ?? 0,
+          storageMb: existing?.storageMb ?? 0,
+          status: (u.subscription_status === 'suspended' ? 'suspended' : 'active') as 'active' | 'suspended',
+          joinedDate: joinedDate,
+          subscriptionExpiresAt: u.subscription_expires_at || existing?.subscriptionExpiresAt,
+          subscriptionGraceUntil: u.subscription_grace_until || existing?.subscriptionGraceUntil,
+          billingCycle: (tier === 'Studio Pro' ? 'monthly' : tier === 'Event Pass' ? 'per_event' : 'none') as any,
+          renewalStatus: (u.subscription_status || 'active') as any,
+        };
+      });
+
+    // Also preserve any unique local users
+    for (const c of current) {
+      if (!mapped.some((m) => m.email.toLowerCase() === c.email.toLowerCase())) {
+        mapped.push(c);
+      }
+    }
+
+    saveRealCustomers(mapped);
+    return mapped;
+  } catch (err) {
+    return getRealCustomers();
+  }
+}
+
 export function updateRealCustomer(id: string, updates: Partial<RealCustomerRecord>): RealCustomerRecord | null {
   const current = getRealCustomers();
   const index = current.findIndex(c => c.id === id);

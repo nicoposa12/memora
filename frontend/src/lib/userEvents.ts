@@ -236,24 +236,15 @@ export function getUserEventLimitStatus(user?: StoredUser | null): EventLimitSta
     };
   }
 
-  // 4. Free plan / default
-  const maxEvents = 1;
-  const allowed = count < maxEvents;
-  const firstEvent = scoped[0];
+  // 4. Free account (requires PRO pass or STUDIO subscription)
   return {
-    allowed,
-    maxEvents,
+    allowed: false,
+    maxEvents: 0,
     currentCount: count,
-    planName: 'Free',
+    planName: 'Free Account',
     isProPass: false,
     isStudio: false,
     isAdmin: false,
-    existingEventName: firstEvent?.name || firstEvent?.title,
-    existingEventSlug: firstEvent?.slug,
-    existingEventDate: firstEvent?.date,
-    existingEventType: firstEvent?.eventType,
-    reason: !allowed
-      ? `The free plan includes 1 trial event. You have already created "${firstEvent?.name || 'Your Event'}". Upgrade to PRO or STUDIO to expand your workspace.`
-      : undefined,
+    reason: 'An active PRO Event Pass or STUDIO Subscription is required to create an event.',
   };
 }

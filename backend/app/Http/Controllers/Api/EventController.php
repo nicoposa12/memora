@@ -33,6 +33,17 @@ class EventController extends Controller
      */
     public function store(StoreEventRequest $request)
     {
+        $user = $request->user();
+
+        // Enforce plan requirement: Only Administrators and Active Studio subscribers can create events directly.
+        // Single-event organizers must purchase a PRO pass via /api/checkout/pro.
+        if (!$user->isAdmin() && !$user->hasActiveStudio()) {
+            return response()->json([
+                'message' => 'An active PRO Event Pass or STUDIO Subscription is required to create an event.',
+                'upgrade_required' => true,
+            ], 403);
+        }
+
         $validated = $request->validated();
 
         $slug = !empty($validated['slug']) 

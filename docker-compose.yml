@@ -46,6 +46,8 @@ services:
       RUN_MIGRATIONS: "true"
       SESSION_DRIVER: database
       FILESYSTEM_DISK: ${FILESYSTEM_DISK:-public}
+    env_file:
+      - ./backend/.env
     ports:
       - "8000:8000"
     volumes:

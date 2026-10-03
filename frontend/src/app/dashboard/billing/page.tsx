@@ -4,137 +4,92 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   Crown, 
-  Check, 
-  ShieldCheck, 
-  Sparkles, 
-  CheckCircle2,
+  CreditCard,
   AlertTriangle,
   Clock,
-  CreditCard,
-  ExternalLink
+  Sparkles,
+  ShieldCheck,
 } from 'lucide-react';
 import { ClientPlan, SubscriptionStatus, isAdminRole } from '@/types/user';
-import { useRealtime, RealtimeStatusBadge } from '@/context/RealtimeContext';
 import { broadcastRealtime } from '@/lib/realtime';
 import { usePlans } from '@/lib/plans';
+import { apiClient } from '@/lib/api';
 
 export default function BillingPage() {
   const { plans } = usePlans();
   const [isAdmin, setIsAdmin] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<ClientPlan>('free');
   const [subStatus, setSubStatus] = useState<SubscriptionStatus>('active');
-  const [subExpiresAt, setSubExpiresAt] = useState<string>('2026-10-24');
-  const [subGraceUntil, setSubGraceUntil] = useState<string>('2026-10-31');
-  const [customerName, setCustomerName] = useState('Organizer');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [toastSuccess, setToastSuccess] = useState<string | null>(null);
+  const [subExpiresAt, setSubExpiresAt] = useState<string>('');
+  const [subGraceUntil, setSubGraceUntil] = useState<string>('');
 
   useEffect(() => {
+    // 1. Load initial cached state from localStorage if available
     try {
       const stored = localStorage.getItem('memora_user');
       if (stored) {
         const parsed = JSON.parse(stored);
         const adminUser = isAdminRole(parsed.role) || parsed.role === 'admin';
         setIsAdmin(adminUser);
-        if (parsed.name) setCustomerName(parsed.name);
 
         if (adminUser) {
-          // Admin accounts have permanent master access: all plans free & unlimited
           setCurrentPlan('studio');
           setSubStatus('active');
           setSubExpiresAt('Permanent Admin Access');
           setSubGraceUntil('Permanent');
-          parsed.plan = 'studio';
-          parsed.subscription_plan = 'studio';
-          parsed.subscription_status = 'active';
-          parsed.maxPhotos = 999999;
-          parsed.photosUsed = 0;
-          localStorage.setItem('memora_user', JSON.stringify(parsed));
         } else {
-          if (parsed.plan) setCurrentPlan(parsed.plan === 'event' ? 'pro' : parsed.plan);
+          const hasStudio = parsed.subscription_plan === 'studio' && (parsed.subscription_status === 'active' || parsed.subscription_status === 'past_due');
+          const hasPro = parsed.subscription_plan === 'pro';
+          setCurrentPlan(hasStudio ? 'studio' : hasPro ? 'pro' : 'free');
           if (parsed.subscription_status) setSubStatus(parsed.subscription_status);
           if (parsed.subscription_expires_at) setSubExpiresAt(parsed.subscription_expires_at);
           if (parsed.subscription_grace_until) setSubGraceUntil(parsed.subscription_grace_until);
         }
       }
     } catch {}
+
+    // 2. Fetch authenticated user profile from backend to ensure state cannot be bypassed via localStorage
+    if (typeof window !== 'undefined' && localStorage.getItem('memora_token')) {
+      apiClient.get('/auth/me')
+        .then((res) => {
+          const me = res.data?.user;
+          if (!me) return;
+
+          const adminUser = isAdminRole(me.role) || me.role === 'admin';
+          setIsAdmin(adminUser);
+
+          const hasStudio = me.subscription_plan === 'studio' && (me.subscription_status === 'active' || me.subscription_status === 'past_due');
+          const hasPro = me.subscription_plan === 'pro';
+          const verifiedPlan: ClientPlan = adminUser ? 'studio' : hasStudio ? 'studio' : hasPro ? 'pro' : 'free';
+
+          setCurrentPlan(verifiedPlan);
+          if (me.subscription_status) setSubStatus(me.subscription_status);
+          if (me.subscription_expires_at) setSubExpiresAt(me.subscription_expires_at);
+          if (me.subscription_grace_until) setSubGraceUntil(me.subscription_grace_until);
+
+          // Synchronize verified backend state to localStorage to purge any manipulated state
+          try {
+            const raw = localStorage.getItem('memora_user');
+            const currentObj = raw ? JSON.parse(raw) : {};
+            const updated = {
+              ...currentObj,
+              id: me.id,
+              name: me.name,
+              email: me.email,
+              role: me.role,
+              subscription_plan: me.subscription_plan,
+              subscription_status: me.subscription_status,
+              subscription_expires_at: me.subscription_expires_at,
+              subscription_grace_until: me.subscription_grace_until,
+              plan: verifiedPlan,
+            };
+            localStorage.setItem('memora_user', JSON.stringify(updated));
+            broadcastRealtime('USER_UPDATED', { plan: verifiedPlan });
+          } catch {}
+        })
+        .catch(() => {});
+    }
   }, []);
-
-  const handlePurchase = (targetPlan: 'pro' | 'studio') => {
-    setIsProcessing(true);
-    setTimeout(() => {
-      try {
-        const stored = localStorage.getItem('memora_user');
-        if (!stored) return;
-        const user = JSON.parse(stored);
-        
-        user.plan = targetPlan;
-        user.subscription_plan = targetPlan === 'studio' ? 'studio' : 'free';
-        user.subscription_status = 'active';
-        user.photosUsed = 0;
-        user.maxPhotos = 999999;
-        
-        const now = new Date();
-        const expDate = isAdmin ? 'Permanent Admin Access' : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        const graceDate = isAdmin ? 'Permanent' : new Date(now.getTime() + 37 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        user.subscription_expires_at = expDate;
-        user.subscription_grace_until = graceDate;
-
-        localStorage.setItem('memora_user', JSON.stringify(user));
-        setCurrentPlan(targetPlan);
-        setSubStatus('active');
-        setSubExpiresAt(expDate);
-        setSubGraceUntil(graceDate);
-
-        // Record transaction in administrative ledger
-        try {
-          const { recordRealTransaction } = require('@/lib/adminRecords');
-          recordRealTransaction({
-            host: user.name || customerName,
-            event: targetPlan === 'pro' ? 'Single Event Pass (PRO)' : `${user.name || customerName}'s Studio Workspace`,
-            plan: isAdmin 
-              ? (targetPlan === 'pro' ? 'PRO Event Pass (Admin Complimentary - ₱0)' : 'STUDIO Subscription (Admin Complimentary - ₱0)')
-              : (targetPlan === 'pro' ? 'PRO Event Pass (₱1,499)' : 'STUDIO Subscription (₱4,999/mo)'),
-            amount: isAdmin ? '₱0.00' : (targetPlan === 'pro' ? '₱1,499.00' : '₱4,999.00'),
-            amountNum: isAdmin ? 0 : (targetPlan === 'pro' ? 1499 : 4999),
-            status: 'Paid',
-            method: isAdmin ? 'Admin Complimentary Grant' : 'GCash / Maya Instant',
-          });
-          broadcastRealtime('USER_UPDATED', { plan: targetPlan });
-        } catch {}
-
-        setToastSuccess(
-          isAdmin
-            ? (targetPlan === 'pro'
-                ? 'Admin Access Applied: PRO Event Pass activated at ₱0.'
-                : 'Admin Access Applied: STUDIO Workspace activated at ₱0.')
-            : (targetPlan === 'pro'
-                ? 'Success! PRO Event Pass (₱1,499) activated. Unlimited photos and zero watermarks for this event!'
-                : 'Success! STUDIO Subscription (₱4,999/mo) activated. All events in your workspace are now covered with zero watermarks!')
-        );
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setIsProcessing(false);
-      }
-    }, isAdmin ? 200 : 600);
-  };
-
-  const handleResetToTrial = () => {
-    try {
-      const stored = localStorage.getItem('memora_user');
-      if (!stored) return;
-      const user = JSON.parse(stored);
-      user.plan = 'free';
-      user.subscription_plan = 'free';
-      user.subscription_status = 'active';
-      localStorage.setItem('memora_user', JSON.stringify(user));
-      setCurrentPlan('free');
-      setSubStatus('active');
-      broadcastRealtime('USER_UPDATED', { plan: 'free' });
-      setToastSuccess('Switched to Free plan (₱0).');
-    } catch {}
-  };
 
   const isStudioActive = currentPlan === 'studio' && subStatus === 'active';
   const isStudioGrace = currentPlan === 'studio' && subStatus === 'past_due';
@@ -146,13 +101,13 @@ export default function BillingPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-6">
         <div>
           <span className="text-[11px] font-mono uppercase tracking-[0.25em] text-primary font-medium">
-            Pricing & Plan
+            Pricing & Plans
           </span>
           <h1 className="font-display text-4xl sm:text-5xl font-light text-foreground tracking-tight mt-1">
-            Pricing, Passes & Billing
+            Passes & Subscriptions
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1 font-light">
-            Try the booth free. Pay only when you run a real event.
+            Preview the booth free. An active event pass or studio subscription is required to run events.
           </p>
         </div>
 
@@ -163,22 +118,22 @@ export default function BillingPage() {
                 ? 'bg-primary/10 text-primary border border-primary/20'
                 : isStudioGrace
                 ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30'
-                : currentPlan === 'pro' || currentPlan === 'event'
+                : currentPlan === 'pro'
                 ? 'bg-primary/10 text-primary border border-primary/20'
                 : 'bg-secondary text-muted-foreground border border-border/60'
             }`}>
               {isStudioActive && <Crown className="w-3.5 h-3.5 text-primary" />}
               {isStudioGrace && <Clock className="w-3.5 h-3.5 text-amber-500" />}
-              {(currentPlan === 'pro' || currentPlan === 'event') && <Sparkles className="w-3.5 h-3.5 text-primary" />}
+              {currentPlan === 'pro' && <Sparkles className="w-3.5 h-3.5 text-primary" />}
               {currentPlan === 'free' && <ShieldCheck className="w-3.5 h-3.5 text-muted-foreground" />}
               <span>
                 {isStudioActive 
-                  ? 'STUDIO Member (Active)' 
+                  ? 'STUDIO Member' 
                   : isStudioGrace 
                   ? 'STUDIO (Grace Period)' 
-                  : (currentPlan === 'pro' || currentPlan === 'event') 
+                  : currentPlan === 'pro' 
                   ? 'PRO Event Active' 
-                  : 'Free Trial (₱0)'}
+                  : 'Free Account'}
               </span>
             </span>
           )}
@@ -194,42 +149,24 @@ export default function BillingPage() {
         </div>
       </div>
 
-      {/* Success Notification Banner */}
-      {toastSuccess && (
-        <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-mono flex items-center justify-between gap-3 animate-in fade-in">
-          <div className="flex items-center gap-2.5">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>{toastSuccess}</span>
-          </div>
-          <button 
-            onClick={() => setToastSuccess(null)}
-            className="text-emerald-400/60 hover:text-emerald-300 text-xs font-bold cursor-pointer"
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
       {/* Grace Period / Past Due Alert Banner (Non-Admin Only) */}
       {!isAdmin && isStudioGrace && (
         <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-950 dark:text-amber-200 text-xs space-y-2 animate-in fade-in shadow-xs">
           <div className="flex items-center gap-2 font-mono uppercase tracking-wider font-bold text-amber-700 dark:text-amber-400">
             <AlertTriangle className="w-4 h-4 shrink-0" />
-            <span>Studio Subscription Past Due • 7-Day Grace Period Active</span>
+            <span>Studio Subscription Past Due • Grace Period Active</span>
           </div>
           <p className="text-foreground/80 leading-relaxed font-sans">
             Your Studio subscription expired on <strong>{subExpiresAt}</strong>. You have a grace period until <strong>{subGraceUntil}</strong> to renew. 
-            <span className="text-amber-700 dark:text-amber-300 font-semibold ml-1">
-              Important: All existing events and guest photos are never deleted and remain 100% accessible.
-            </span>
+            All existing events and guest photos remain safely preserved and accessible.
           </p>
           <div className="pt-2 flex items-center gap-3">
-            <button
-              onClick={() => handlePurchase('studio')}
-              className="py-2 px-5 rounded-full bg-amber-600 hover:bg-amber-500 text-white font-mono font-medium text-[11px] uppercase tracking-wider transition-colors cursor-pointer shadow-2xs"
+            <Link
+              href="/checkout/studio"
+              className="py-2 px-5 rounded-full bg-amber-600 hover:bg-amber-500 text-white font-mono font-medium text-[11px] uppercase tracking-wider transition-colors cursor-pointer shadow-2xs inline-block"
             >
               Renew Studio (₱4,999/mo)
-            </button>
+            </Link>
           </div>
         </div>
       )}
@@ -243,16 +180,15 @@ export default function BillingPage() {
           </div>
           <p className="text-muted-foreground leading-relaxed font-sans">
             Your subscription has expired. As part of our data retention policy, 
-            <strong className="text-foreground"> your existing events, guest photos, and galleries remain safely preserved, viewable, and downloadable.</strong>
-            New premium event creation is restricted until renewed.
+            your existing events and galleries remain preserved and accessible. New event creation is restricted until renewed.
           </p>
           <div className="pt-2 flex items-center gap-3">
-            <button
-              onClick={() => handlePurchase('studio')}
-              className="py-2 px-5 rounded-full bg-foreground hover:bg-foreground/90 text-background font-mono font-medium text-[11px] uppercase tracking-wider transition-colors cursor-pointer shadow-2xs"
+            <Link
+              href="/checkout/studio"
+              className="py-2 px-5 rounded-full bg-foreground hover:bg-foreground/90 text-background font-mono font-medium text-[11px] uppercase tracking-wider transition-colors cursor-pointer shadow-2xs inline-block"
             >
               Reactivate Studio (₱4,999/mo)
-            </button>
+            </Link>
           </div>
         </div>
       )}
@@ -261,7 +197,7 @@ export default function BillingPage() {
       <div>
         <div className="text-center max-w-xl mx-auto mb-8">
           <p className="text-sm text-muted-foreground font-light">
-            Try the booth free. Pay only when you run a real event.
+            Preview the booth free. Select an event pass or monthly studio subscription to host events.
           </p>
         </div>
 
@@ -274,7 +210,7 @@ export default function BillingPage() {
                   {plans.free.eyebrow}
                 </p>
                 <span className="rounded-full bg-[#261f1d]/10 px-3 py-1 font-mono text-[9px] uppercase tracking-[0.2em] text-[#261f1d] font-semibold">
-                  {isAdmin ? 'Included' : (currentPlan === 'free' ? 'Current' : plans.free.badge)}
+                  {isAdmin ? 'Included' : (currentPlan === 'free' ? 'Current Plan' : plans.free.badge)}
                 </span>
               </div>
               <p className="mt-3 font-display text-5xl sm:text-6xl font-light tracking-tight text-[#261f1d]">
@@ -294,13 +230,9 @@ export default function BillingPage() {
                 ))}
               </ul>
             </div>
-            <button
-              type="button"
-              onClick={handleResetToTrial}
-              className="mt-9 block w-full rounded-full py-3.5 text-center text-xs font-semibold uppercase tracking-[0.15em] border border-[#261f1d]/20 hover:bg-[#261f1d]/5 text-[#261f1d] transition-colors cursor-pointer"
-            >
-              {isAdmin ? 'Reset to Trial (₱0)' : currentPlan === 'free' ? 'Try The Booth (₱0 Active)' : 'Reset To Trial (₱0)'}
-            </button>
+            <div className="mt-9 block w-full rounded-full py-3.5 text-center text-xs font-semibold uppercase tracking-[0.15em] border border-[#261f1d]/20 text-[#261f1d]/60 bg-[#261f1d]/5 select-none font-mono">
+              {currentPlan === 'free' ? 'Current Account Plan' : 'Included with Account'}
+            </div>
           </div>
 
           {/* Card 2: PRO (Featured Luxury Dark Card) */}
@@ -335,14 +267,12 @@ export default function BillingPage() {
                 ))}
               </ul>
             </div>
-            <button
-              type="button"
-              disabled={isProcessing}
-              onClick={() => handlePurchase('pro')}
-              className="mt-9 block w-full rounded-full py-3.5 text-center text-xs font-semibold uppercase tracking-[0.15em] bg-[#f05a28] text-white hover:opacity-95 transition-opacity shadow-lg shadow-[#f05a28]/25 font-bold cursor-pointer disabled:opacity-60"
+            <Link
+              href="/checkout/pro"
+              className="mt-9 block w-full rounded-full py-3.5 text-center text-xs font-semibold uppercase tracking-[0.15em] bg-[#f05a28] text-white hover:opacity-95 transition-opacity shadow-lg shadow-[#f05a28]/25 font-bold cursor-pointer font-mono"
             >
-              {isProcessing ? 'Activating...' : isAdmin ? 'Upgrade An Event (₱0 Admin Access)' : `Upgrade An Event (${plans.pro.priceDisplay})`}
-            </button>
+              {isAdmin ? 'Upgrade An Event (₱0 Admin Access)' : `Upgrade An Event (${plans.pro.priceDisplay})`}
+            </Link>
           </div>
 
           {/* Card 3: STUDIO Workspace */}
@@ -377,18 +307,20 @@ export default function BillingPage() {
                 ))}
               </ul>
             </div>
-            <button
-              type="button"
-              disabled={isProcessing}
-              onClick={() => handlePurchase('studio')}
-              className="mt-9 block w-full rounded-full py-3.5 text-center text-xs font-semibold uppercase tracking-[0.15em] border border-[#261f1d]/20 hover:bg-[#261f1d]/5 text-[#261f1d] transition-colors cursor-pointer disabled:opacity-60 font-semibold"
-            >
-              {isAdmin 
-                ? 'Subscribe Studio (₱0 Admin Access)' 
-                : isStudioActive 
-                ? 'Studio Active (Renews Soon)' 
-                : `Subscribe Studio (${plans.studio.priceDisplay}/mo)`}
-            </button>
+            {isStudioActive ? (
+              <div className="mt-9 block w-full rounded-full py-3.5 text-center text-xs font-semibold uppercase tracking-[0.15em] border border-[#261f1d]/20 text-[#261f1d]/60 bg-[#261f1d]/5 select-none font-mono">
+                Studio Active
+              </div>
+            ) : (
+              <Link
+                href="/checkout/studio"
+                className="mt-9 block w-full rounded-full py-3.5 text-center text-xs font-semibold uppercase tracking-[0.15em] border border-[#261f1d]/20 hover:bg-[#261f1d]/5 text-[#261f1d] transition-colors cursor-pointer font-semibold font-mono"
+              >
+                {isAdmin 
+                  ? 'Subscribe Studio (₱0 Admin Access)' 
+                  : `Subscribe Studio (${plans.studio.priceDisplay}/mo)`}
+              </Link>
+            )}
           </div>
         </div>
       </div>

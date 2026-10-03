@@ -2,9 +2,11 @@
 
 use App\Http\Controllers\Api\Admin\AuditLogController;
 use App\Http\Controllers\Api\Admin\TwoFactorController;
+use App\Http\Controllers\Api\Admin\UserAdminController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CheckoutController;
 use App\Http\Controllers\Api\EventController;
+use App\Http\Controllers\Api\GoogleAuthController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\PaymentWebhookController;
 use App\Http\Controllers\Api\PhotoController;
@@ -23,6 +25,11 @@ Route::get('/health', [HealthController::class, 'check']);
 Route::middleware('throttle:auth')->group(function () {
     Route::post('/auth/register', [AuthController::class, 'register']);
     Route::post('/auth/login', [AuthController::class, 'login']);
+
+    // Google OAuth Endpoints
+    Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect']);
+    Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback']);
+    Route::post('/auth/google/token', [GoogleAuthController::class, 'token']);
 });
 
 // Verified Payment Webhook (Xendit / Payment provider callbacks)
@@ -52,6 +59,10 @@ Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
     // Platform Admin Only Endpoints (RBAC protected)
     Route::middleware('role:admin')->prefix('admin')->group(function () {
         Route::get('/audit-logs', [AuditLogController::class, 'index']);
+        Route::get('/users', [UserAdminController::class, 'index']);
+        Route::post('/users', [UserAdminController::class, 'store']);
+        Route::put('/users/{user}', [UserAdminController::class, 'update']);
+        Route::delete('/users/{user}', [UserAdminController::class, 'destroy']);
         Route::post('/2fa/setup', [TwoFactorController::class, 'setup']);
         Route::post('/2fa/confirm', [TwoFactorController::class, 'confirm']);
         Route::post('/2fa/disable', [TwoFactorController::class, 'disable']);

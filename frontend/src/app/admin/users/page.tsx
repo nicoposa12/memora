@@ -34,8 +34,10 @@ import {
   deleteRealCustomer,
   recordRealAuditLog, 
   isAdminRecord, 
+  fetchBackendCustomers,
   RealCustomerRecord 
 } from '@/lib/adminRecords';
+import { apiClient } from '@/lib/api';
 import { useModal } from '@/context/ModalContext';
 import { useRealtime } from '@/context/RealtimeContext';
 import { broadcastRealtime } from '@/lib/realtime';
@@ -200,14 +202,26 @@ export default function AdminUsersPage() {
   const [editGracePeriodDays, setEditGracePeriodDays] = useState('7');
   const [editStudioName, setEditStudioName] = useState('');
 
-  const loadData = useCallback(() => {
-    const list = getRealCustomers().filter(c => !isAdminRecord(c));
-    setCustomers(list);
+  const loadData = useCallback(async () => {
+    // 1. Instant local render
+    const local = getRealCustomers().filter(c => !isAdminRecord(c));
+    setCustomers(local);
     setIsLoaded(true);
+
+    // 2. Fetch directly from backend PostgreSQL database in real time
+    try {
+      const fresh = await fetchBackendCustomers();
+      if (Array.isArray(fresh)) {
+        setCustomers(fresh.filter(c => !isAdminRecord(c)));
+      }
+    } catch {}
   }, []);
 
   useEffect(() => {
     loadData();
+    // 3-second realtime background sync for instant cross-tab / cross-device updates
+    const interval = setInterval(loadData, 3000);
+    return () => clearInterval(interval);
   }, [loadData]);
 
   // Sync when realtime user events fire
@@ -251,6 +265,19 @@ export default function AdminUsersPage() {
       renewalStatus: 'active',
     });
 
+    // Sync to PostgreSQL backend
+    const numericId = id.replace(/\D/g, '');
+    if (numericId) {
+      try {
+        const planCode = newTier === 'Studio Pro' ? 'studio' : newTier === 'Event Pass' ? 'pro' : 'none';
+        apiClient.put(`/admin/users/${numericId}`, {
+          subscription_plan: planCode,
+          subscription_status: 'active',
+          subscription_expires_at: expiresAt,
+        }).catch(() => {});
+      } catch {}
+    }
+
     if (updated) {
       recordRealAuditLog(`Organizer "${target.name}" (${id}) plan changed to ${newTier}`, 'Administrator', 'info');
       broadcastRealtime('USER_UPDATED', { id, tier: newTier });
@@ -279,12 +306,23 @@ export default function AdminUsersPage() {
 
     const newStatus: 'active' | 'suspended' = willSuspend ? 'suspended' : 'active';
     updateRealCustomer(id, { status: newStatus });
+
+    // Sync to PostgreSQL backend
+    const numericId = id.replace(/\D/g, '');
+    if (numericId) {
+      try {
+        await apiClient.put(`/admin/users/${numericId}`, {
+          subscription_status: newStatus,
+        });
+      } catch {}
+    }
+
     recordRealAuditLog(
       `Organizer "${target.name}" (${id}) account status changed to ${newStatus}`,
       'Administrator',
       willSuspend ? 'warn' : 'info'
     );
-    broadcastRealtime('USER_UPDATED', { id, status: newStatus });
+    broadcastRealtime('USER_UPDATED', { id, email: target.email, status: newStatus });
     loadData();
     showToast(`Account status updated to ${newStatus}`);
   };
@@ -305,6 +343,13 @@ export default function AdminUsersPage() {
 
     if (!confirmed) return;
 
+    const numericId = id.replace(/\D/g, '');
+    if (numericId) {
+      try {
+        await apiClient.delete(`/admin/users/${numericId}`);
+      } catch {}
+    }
+
     const success = deleteRealCustomer(id);
     if (success) {
       recordRealAuditLog(
@@ -312,7 +357,7 @@ export default function AdminUsersPage() {
         'Administrator',
         'alert'
       );
-      broadcastRealtime('USER_UPDATED', { id, type: 'deleted' });
+      broadcastRealtime('USER_UPDATED', { id, email: target.email, type: 'deleted' });
       if (editingCustomer && editingCustomer.id === id) {
         setEditingCustomer(null);
       }
@@ -389,12 +434,27 @@ export default function AdminUsersPage() {
     };
 
     updateRealCustomer(editingCustomer.id, updates);
+
+    // Sync to PostgreSQL backend
+    const numericId = editingCustomer.id.replace(/\D/g, '');
+    if (numericId) {
+      try {
+        const planCode = editTier === 'Studio Pro' ? 'studio' : editTier === 'Event Pass' ? 'pro' : 'none';
+        apiClient.put(`/admin/users/${numericId}`, {
+          name: updates.name,
+          subscription_plan: planCode,
+          subscription_status: editStatus,
+          subscription_expires_at: expiresAt,
+        }).catch(() => {});
+      } catch {}
+    }
+
     recordRealAuditLog(
       `Updated user account & subscription for "${editingCustomer.name}" (${editingCustomer.id})`,
       'Administrator',
       'info'
     );
-    broadcastRealtime('USER_UPDATED', { id: editingCustomer.id, ...updates });
+    broadcastRealtime('USER_UPDATED', { id: editingCustomer.id, email: editingCustomer.email, status: editStatus, ...updates });
     loadData();
     setEditingCustomer(null);
     showToast(`Subscription settings saved for ${editingCustomer.name}`);
@@ -438,6 +498,18 @@ export default function AdminUsersPage() {
       billingCycle,
       renewalStatus: 'active',
     });
+
+    // Sync to PostgreSQL backend
+    try {
+      const planCode = newUserTier === 'Studio Pro' ? 'studio' : newUserTier === 'Event Pass' ? 'pro' : 'none';
+      apiClient.post('/admin/users', {
+        name: created.name,
+        email: created.email,
+        role: 'organizer',
+        subscription_plan: planCode,
+        subscription_status: 'active',
+      }).catch(() => {});
+    } catch {}
 
     recordRealAuditLog(
       `Created organizer account for "${created.name}" (${created.email}) with ${newUserTier} plan`,

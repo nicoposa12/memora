@@ -12,8 +12,11 @@ import {
   HardDrive,
   UserPlus
 } from 'lucide-react';
-import { getRealCustomers, saveRealCustomers, recordRealAuditLog, RealCustomerRecord } from '@/lib/adminRecords';
+import { getRealCustomers, saveRealCustomers, recordRealAuditLog, fetchBackendCustomers, RealCustomerRecord } from '@/lib/adminRecords';
 import { useModal } from '@/context/ModalContext';
+import { useRealtime } from '@/context/RealtimeContext';
+import { apiClient } from '@/lib/api';
+import { broadcastRealtime } from '@/lib/realtime';
 
 export default function AdminCustomersPage() {
   const { confirm: confirmModal } = useModal();
@@ -23,20 +26,38 @@ export default function AdminCustomersPage() {
   const [customers, setCustomers] = useState<RealCustomerRecord[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  useEffect(() => {
+  const loadData = React.useCallback(async () => {
     setCustomers(getRealCustomers());
     setIsLoaded(true);
+    try {
+      const fresh = await fetchBackendCustomers();
+      if (Array.isArray(fresh)) {
+        setCustomers(fresh);
+      }
+    } catch {}
   }, []);
 
+  useEffect(() => {
+    loadData();
+    const interval = setInterval(loadData, 3000);
+    return () => clearInterval(interval);
+  }, [loadData]);
+
+  useRealtime(['USER_UPDATED', 'ACTIVITY_LOGGED'], () => {
+    loadData();
+  });
+
   const handleUpdateTier = (id: string, newTier: 'Free Trial' | 'Event Pass' | 'Studio Pro') => {
+    const target = customers.find(c => c.id === id);
+    let expiresAt = target?.subscriptionExpiresAt;
+    if (!expiresAt && (newTier === 'Event Pass' || newTier === 'Studio Pro')) {
+      const d = new Date();
+      d.setDate(d.getDate() + 30);
+      expiresAt = d.toISOString().split('T')[0];
+    }
+
     const updated = customers.map(c => {
       if (c.id !== id) return c;
-      let expiresAt = c.subscriptionExpiresAt;
-      if (!expiresAt && (newTier === 'Event Pass' || newTier === 'Studio Pro')) {
-        const d = new Date();
-        d.setDate(d.getDate() + 30);
-        expiresAt = d.toISOString().split('T')[0];
-      }
       return {
         ...c,
         tier: newTier,
@@ -47,7 +68,19 @@ export default function AdminCustomersPage() {
     });
     setCustomers(updated);
     saveRealCustomers(updated);
+
+    const numericId = id.replace(/\D/g, '');
+    if (numericId) {
+      const planCode = newTier === 'Studio Pro' ? 'studio' : newTier === 'Event Pass' ? 'pro' : 'none';
+      apiClient.put(`/admin/users/${numericId}`, {
+        subscription_plan: planCode,
+        subscription_status: 'active',
+        subscription_expires_at: expiresAt,
+      }).catch(() => {});
+    }
+
     recordRealAuditLog(`Account ${id} plan changed to ${newTier}`, 'Administrator', 'info');
+    broadcastRealtime('USER_UPDATED', { id, email: target?.email, tier: newTier });
     showToast(`Updated account plan to ${newTier}`);
   };
 
@@ -65,15 +98,27 @@ export default function AdminCustomersPage() {
       });
       if (!confirmed) return;
     }
+    const newStatus = (willSuspend ? 'suspended' : 'active') as 'active' | 'suspended';
     const updated = customers.map(c =>
       c.id === id
-        ? { ...c, status: (c.status === 'active' ? 'suspended' : 'active') as 'active' | 'suspended' }
+        ? { ...c, status: newStatus }
         : c
     );
     setCustomers(updated);
     saveRealCustomers(updated);
-    recordRealAuditLog(`Account ${id} status set to ${willSuspend ? 'suspended' : 'active'}`, 'Administrator', 'warn');
-    showToast(`Account status updated to ${willSuspend ? 'suspended' : 'active'}`);
+
+    const numericId = id.replace(/\D/g, '');
+    if (numericId) {
+      try {
+        await apiClient.put(`/admin/users/${numericId}`, {
+          subscription_status: newStatus,
+        });
+      } catch {}
+    }
+
+    recordRealAuditLog(`Account ${id} status set to ${newStatus}`, 'Administrator', willSuspend ? 'warn' : 'info');
+    broadcastRealtime('USER_UPDATED', { id, email: target?.email, status: newStatus });
+    showToast(`Account status updated to ${newStatus}`);
   };
 
   const showToast = (msg: string) => {
