@@ -101,6 +101,7 @@ import {
   GraduationTrophyIcon,
   GraduationSparklesIcon,
 } from '@/components/graduation-theme/GraduationIcons';
+import { Logo } from '@/components/Logo';
 
 const isLightColor = (hex: string) => {
   if (!hex) return false;
@@ -794,7 +795,6 @@ export default function AdminPlansPage() {
         </div>
 
         <div className="flex items-center gap-2.5">
-          <RealtimeStatusBadge />
           <button
             type="button"
             onClick={handleResetDefaults}
@@ -2731,8 +2731,11 @@ export default function AdminPlansPage() {
                                 <span>Memora Watermark Included</span>
                               </div>
                             ) : (
-                              <div className="text-[7px] font-mono uppercase tracking-widest opacity-60 mt-0.5" style={{ color: schoolPalette.textSecondary }}>
-                                ✦ ZERO WATERMARK ✦
+                              <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: schoolPalette.textSecondary }}>
+                                <Logo className="w-2.5 h-2.5 shrink-0" />
+                                <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
+                                  MEMORA
+                                </span>
                               </div>
                             )}
                           </>
@@ -2748,8 +2751,11 @@ export default function AdminPlansPage() {
                                 <span>Memora Watermark Included</span>
                               </div>
                             ) : (
-                              <div className="text-[7px] font-mono uppercase tracking-widest opacity-60 mt-0.5">
-                                ✦ ZERO WATERMARK ✦
+                              <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none">
+                                <Logo className="w-2.5 h-2.5 shrink-0" />
+                                <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
+                                  MEMORA
+                                </span>
                               </div>
                             )}
                           </>
@@ -2791,8 +2797,11 @@ export default function AdminPlansPage() {
                                 <span>Memora Watermark Included</span>
                               </div>
                             ) : (
-                              <div className="text-[7px] font-mono uppercase tracking-widest opacity-60 mt-0.5">
-                                ✦ ZERO WATERMARK ✦
+                              <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none">
+                                <Logo className="w-2.5 h-2.5 shrink-0" />
+                                <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
+                                  MEMORA
+                                </span>
                               </div>
                             )}
                           </>

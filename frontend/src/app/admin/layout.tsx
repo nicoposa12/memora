@@ -28,11 +28,11 @@ export default function AdminLayout({
           setIsAuthorized(false);
         }
       } else {
-        // Fallback for demo: default to authorized if navigating directly, or check
-        setIsAuthorized(true);
+        // No session: deny access
+        setIsAuthorized(false);
       }
     } catch {
-      setIsAuthorized(true);
+      setIsAuthorized(false);
     }
   }, []);
 
@@ -60,16 +60,6 @@ export default function AdminLayout({
             <ArrowLeft className="w-4 h-4" />
             <span>Return to Organizer Studio</span>
           </Link>
-          <button
-            onClick={() => {
-              // Elevate to admin for demo
-              localStorage.setItem('memora_user', JSON.stringify({ name: 'Administrator', email: 'admin@memora.studio', role: 'admin' }));
-              setIsAuthorized(true);
-            }}
-            className="px-4 py-2.5 rounded-xl bg-card border border-border text-xs font-mono text-foreground hover:bg-secondary transition-all cursor-pointer shadow-xs"
-          >
-            Switch to Admin (Demo)
-          </button>
         </div>
       </div>
     );

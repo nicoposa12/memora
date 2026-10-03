@@ -27,6 +27,7 @@ import {
   getRealTotalPhotos,
   recordRealAuditLog,
   isAdminRecord,
+  isAdminHostName,
   RealBoothRecord,
   RealCustomerRecord,
   RealTransaction
@@ -44,7 +45,7 @@ export default function AdminDashboardPage() {
   const loadAdminData = React.useCallback(() => {
     const booths = getRealBooths();
     const custs = getRealCustomers().filter(c => !isAdminRecord(c));
-    const txs = getRealTransactions().filter(t => !isAdminRecord({ name: t.host }));
+    const txs = getRealTransactions().filter(t => !isAdminHostName(t.host));
     const photos = getRealTotalPhotos();
 
     setLiveBooths(booths);
@@ -108,7 +109,6 @@ export default function AdminDashboardPage() {
             <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-medium">
               {activeBoothsCount > 0 ? `${activeBoothsCount} active photobooth${activeBoothsCount > 1 ? 's' : ''}` : 'All systems normal'}
             </span>
-            <RealtimeStatusBadge />
           </div>
           <h1 className="font-display text-3xl sm:text-4xl text-foreground font-medium tracking-tight mt-1">
             Overview

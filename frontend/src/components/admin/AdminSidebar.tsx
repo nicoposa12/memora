@@ -28,7 +28,7 @@ export function AdminSidebar({ onCloseMobile }: AdminSidebarProps) {
   const router = useRouter();
 
   const [adminName, setAdminName] = useState('Chief Administrator');
-  const [adminEmail, setAdminEmail] = useState('admin@memora.studio');
+  const [adminEmail, setAdminEmail] = useState('');
   const [custCount, setCustCount] = useState(0);
   const [activeBoothsCount, setActiveBoothsCount] = useState(0);
   const [flaggedCount, setFlaggedCount] = useState(0);

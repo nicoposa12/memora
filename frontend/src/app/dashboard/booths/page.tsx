@@ -22,6 +22,7 @@ import {
 import { QrShareCard } from '@/features/events/components/QrShareCard';
 import { useRealtime, RealtimeStatusBadge } from '@/context/RealtimeContext';
 import { broadcastRealtime } from '@/lib/realtime';
+import { getScopedEvents } from '@/lib/userEvents';
 
 interface BoothItem {
   id: string;
@@ -43,30 +44,27 @@ export default function ActiveBoothsPage() {
   const loadBooths = React.useCallback(() => {
     try {
       const storedPrefs = JSON.parse(localStorage.getItem('memora_booth_preferences') || '{}');
-      const stored = localStorage.getItem('memora_events');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setBooths(parsed.map((e: any, idx: number) => {
-            const bId = e.id || `${idx + 1}`;
-            const pref = storedPrefs[bId] || {};
-            return {
-              id: bId,
-              name: e.name || 'Custom Event',
-              slug: e.slug || 'custom-event',
-              status: e.status === 'draft' ? 'draft' : 'live',
-              date: e.date || 'Upcoming',
-              activeGuests: 0,
-              totalCaptures: e.photoCount || e.photosCount || 0,
-              defaultFilter: 'Vogue Noir (B&W)',
-              countdownSeconds: pref.countdownSeconds ?? 3,
-              soundEnabled: pref.soundEnabled ?? true,
-              watermark: !e.isPremium && e.plan !== 'pro' && e.plan !== 'studio',
-            };
-          }));
-        } else {
-          setBooths([]);
-        }
+      const userScoped = getScopedEvents();
+      if (Array.isArray(userScoped) && userScoped.length > 0) {
+        setBooths(userScoped.map((e: any, idx: number) => {
+          const bId = e.id || `${idx + 1}`;
+          const pref = storedPrefs[bId] || {};
+          return {
+            id: bId,
+            name: e.name || 'Custom Event',
+            slug: e.slug || 'custom-event',
+            status: e.status === 'draft' ? 'draft' : 'live',
+            date: e.date || 'Upcoming',
+            activeGuests: 0,
+            totalCaptures: e.photoCount || e.photosCount || 0,
+            defaultFilter: 'Vogue Noir (B&W)',
+            countdownSeconds: pref.countdownSeconds ?? 3,
+            soundEnabled: pref.soundEnabled ?? true,
+            watermark: !e.isPremium && e.plan !== 'pro' && e.plan !== 'studio',
+          };
+        }));
+      } else {
+        setBooths([]);
       }
     } catch {}
   }, []);
@@ -128,8 +126,6 @@ export default function ActiveBoothsPage() {
             <span className="font-mono text-[11px] uppercase tracking-[0.25em] text-primary font-medium">
               Photobooths
             </span>
-            <span className="text-muted-foreground/30">•</span>
-            <RealtimeStatusBadge />
           </div>
           <h1 className="font-display text-4xl sm:text-5xl font-light text-foreground tracking-tight mt-1">
             Photobooths & Kiosks
@@ -177,20 +173,9 @@ export default function ActiveBoothsPage() {
             <div>
               <div className="flex items-center justify-between gap-2 mb-3">
                 <div className="flex items-center gap-2">
-                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider font-semibold ${
-                    booth.status === 'live'
-                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/25'
-                      : booth.status === 'ready'
-                      ? 'bg-secondary text-foreground border border-border/80'
-                      : 'bg-secondary/60 text-muted-foreground border border-border/60'
-                  }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${booth.status === 'live' ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground'}`} />
-                    <span>{booth.status === 'live' ? 'LIVE NOW' : booth.status.toUpperCase()}</span>
-                  </span>
-
-                  {booth.status === 'live' && (
-                    <span className="text-[10px] font-mono text-muted-foreground tracking-wider">
-                      {booth.activeGuests} GUESTS ONLINE
+                  {booth.status !== 'live' && (
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider font-semibold bg-secondary text-foreground border border-border/80">
+                      <span>{booth.status.toUpperCase()}</span>
                     </span>
                   )}
                 </div>

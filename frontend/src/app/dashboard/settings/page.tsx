@@ -15,8 +15,10 @@ import {
   Eye,
   Save
 } from 'lucide-react';
+import { formatFirstName } from '@/lib/utils';
 
 export default function SettingsPage() {
+  const [hostName, setHostName] = useState('');
   const [studioName, setStudioName] = useState('');
   const [hostEmail, setHostEmail] = useState('');
   const [customDomain, setCustomDomain] = useState('');
@@ -34,6 +36,7 @@ export default function SettingsPage() {
       const storedSettings = localStorage.getItem('memora_studio_settings');
       if (storedSettings) {
         const s = JSON.parse(storedSettings);
+        if (s.hostName) setHostName(s.hostName);
         if (s.studioName) setStudioName(s.studioName);
         if (s.hostEmail) setHostEmail(s.hostEmail);
         if (s.customDomain) setCustomDomain(s.customDomain);
@@ -44,19 +47,23 @@ export default function SettingsPage() {
         if (s.mirrorCamera !== undefined) setMirrorCamera(s.mirrorCamera);
         if (s.flashSound !== undefined) setFlashSound(s.flashSound);
         if (s.pinProtected !== undefined) setPinProtected(s.pinProtected);
-        return;
       }
 
       const stored = localStorage.getItem('memora_user');
       if (stored) {
         const u = JSON.parse(stored);
-        if (u.name) setStudioName(`${u.name}'s Studio`);
-        if (u.email) setHostEmail(u.email);
+        if (!hostName) {
+          if (u.firstName) setHostName(u.firstName);
+          else if (u.name) setHostName(formatFirstName(u));
+        }
+        if (!studioName && u.name) setStudioName(`${formatFirstName(u)}'s Studio`);
+        if (!hostEmail && u.email) setHostEmail(u.email);
       }
     } catch {}
   }, []);
 
   const persistSettings = (updates: Partial<{
+    hostName: string;
     studioName: string;
     hostEmail: string;
     customDomain: string;
@@ -69,7 +76,9 @@ export default function SettingsPage() {
     hostPin: string;
   }>) => {
     try {
+      const nextHostName = updates.hostName !== undefined ? updates.hostName : hostName;
       const current = {
+        hostName: nextHostName,
         studioName,
         hostEmail,
         customDomain,
@@ -83,6 +92,17 @@ export default function SettingsPage() {
         ...updates,
       };
       localStorage.setItem('memora_studio_settings', JSON.stringify(current));
+
+      if (nextHostName) {
+        const stored = localStorage.getItem('memora_user');
+        if (stored) {
+          const u = JSON.parse(stored);
+          u.firstName = formatFirstName(nextHostName);
+          u.name = nextHostName;
+          localStorage.setItem('memora_user', JSON.stringify(u));
+          window.dispatchEvent(new Event('storage'));
+        }
+      }
     } catch {}
   };
 
@@ -125,7 +145,23 @@ export default function SettingsPage() {
             <h2 className="font-display text-2xl text-foreground font-light">Studio Profile</h2>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            <div>
+              <label className="block text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-1.5 font-medium">
+                Host First Name
+              </label>
+              <input
+                type="text"
+                value={hostName}
+                placeholder="e.g. Juan"
+                onChange={(e) => {
+                  setHostName(e.target.value);
+                  persistSettings({ hostName: e.target.value });
+                }}
+                className="w-full bg-secondary/50 border border-border/70 rounded-xl px-4 py-2.5 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground font-mono shadow-2xs transition-all"
+              />
+            </div>
+
             <div>
               <label className="block text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-1.5 font-medium">
                 Studio Name

@@ -74,7 +74,6 @@ export default function AdminSystemAuditPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <RealtimeStatusBadge />
           <button
             type="button"
             onClick={handleFlushCache}

@@ -28,6 +28,7 @@ import { useRealtime, RealtimeStatusBadge } from '@/context/RealtimeContext';
 import { broadcastRealtime } from '@/lib/realtime';
 import { useModal } from '@/context/ModalContext';
 import { getEventEmoji, getEventLabel, EVENT_TYPES_LIST } from '@/types';
+import { getScopedEvents, deleteStoredEvent, updateStoredEvent, getCurrentUser, getUserEventLimitStatus, EventLimitStatus } from '@/lib/userEvents';
 
 interface PhotoboothEvent {
   id: string;
@@ -61,13 +62,13 @@ export default function EventOrganizerEventsPage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isUpgradingId, setIsUpgradingId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [limitStatus, setLimitStatus] = useState<EventLimitStatus | null>(null);
 
   const loadEventsData = React.useCallback(() => {
     try {
-      const stored = localStorage.getItem('memora_user');
-      if (stored) {
-        const u = JSON.parse(stored);
-        const adminUser = isAdminRole(u.role) || u.email?.toLowerCase().includes('admin') || u.role === 'admin';
+      const u = getCurrentUser();
+      if (u) {
+        const adminUser = isAdminRole(u.role) || u.role === 'admin';
         setIsAdmin(adminUser);
         if (adminUser || u.subscription_plan === 'studio') {
           setStudioPlan('studio');
@@ -79,31 +80,31 @@ export default function EventOrganizerEventsPage() {
         }
       }
 
-      const storedEvents = localStorage.getItem('memora_events');
-      if (storedEvents) {
-        const parsed = JSON.parse(storedEvents);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const mapped: PhotoboothEvent[] = parsed.map((e: any, idx: number) => ({
-            id: e.id || `EVT-USR-${idx}`,
-            name: e.name || 'Custom Event',
-            slug: e.slug || 'custom-event',
-            date: e.date || 'Upcoming',
-            venue: e.location || 'Private Venue',
-            eventType: e.eventType || 'wedding',
-            themeColor: e.primaryColor || '#d8b86a',
-            status: e.status || 'active',
-            plan: e.plan || (e.isPremium ? 'pro' : 'free'),
-            price: e.plan === 'pro' || e.isPremium ? '₱1,499' : '₱0',
-            paymentStatus: e.plan === 'pro' || e.isPremium ? 'PAID' : 'UNPAID',
-            photosCount: e.photoCount || e.photosCount || 0,
-            activeGuests: e.activeGuests || 0,
-            allowGuestUploads: true,
-            publicGallery: true,
-          }));
-          setEvents(mapped);
-        } else {
-          setEvents([]);
-        }
+      const status = getUserEventLimitStatus(u);
+      setLimitStatus(status);
+
+      const userScoped = getScopedEvents(u);
+      if (Array.isArray(userScoped) && userScoped.length > 0) {
+        const mapped: PhotoboothEvent[] = userScoped.map((e: any, idx: number) => ({
+          id: e.id || `EVT-USR-${idx}`,
+          name: e.name || 'Custom Event',
+          slug: e.slug || 'custom-event',
+          date: e.date || 'Upcoming',
+          venue: e.location || 'Private Venue',
+          eventType: e.eventType || 'wedding',
+          themeColor: e.primaryColor || '#d8b86a',
+          status: e.status || 'active',
+          plan: e.plan || (e.isPremium ? 'pro' : 'free'),
+          price: e.plan === 'pro' || e.isPremium ? '₱1,499' : '₱0',
+          paymentStatus: e.plan === 'pro' || e.isPremium ? 'PAID' : 'UNPAID',
+          photosCount: e.photoCount || e.photosCount || 0,
+          activeGuests: e.activeGuests || 0,
+          allowGuestUploads: true,
+          publicGallery: true,
+        }));
+        setEvents(mapped);
+      } else {
+        setEvents([]);
       }
     } catch {}
   }, []);
@@ -175,16 +176,15 @@ export default function EventOrganizerEventsPage() {
 
   const handleToggleArchive = (id: string) => {
     setEvents(prev => {
-      const next = prev.map(e =>
+      const target = prev.find(e => e.id === id);
+      const newStatus = target?.status === 'active' ? 'archived' : 'active';
+      updateStoredEvent({ id, status: newStatus });
+      broadcastRealtime('EVENT_UPDATED', { id });
+      return prev.map(e =>
         e.id === id
-          ? { ...e, status: (e.status === 'active' ? 'archived' : 'active') as 'active' | 'archived' }
+          ? { ...e, status: newStatus as 'active' | 'archived' }
           : e
       );
-      try {
-        localStorage.setItem('memora_events', JSON.stringify(next));
-      } catch {}
-      broadcastRealtime('EVENT_UPDATED', { id });
-      return next;
     });
     showToast('Event status updated.');
   };
@@ -201,14 +201,9 @@ export default function EventOrganizerEventsPage() {
     });
 
     if (confirmed) {
-      setEvents(prev => {
-        const next = prev.filter(e => e.id !== id);
-        try {
-          localStorage.setItem('memora_events', JSON.stringify(next));
-        } catch {}
-        broadcastRealtime('EVENT_DELETED', { id });
-        return next;
-      });
+      deleteStoredEvent(id);
+      setEvents(prev => prev.filter(e => e.id !== id));
+      broadcastRealtime('EVENT_DELETED', { id });
       showToast('Event permanently deleted.');
     }
   };
@@ -216,14 +211,17 @@ export default function EventOrganizerEventsPage() {
   const handleSaveEdit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingEvent) return;
-    setEvents(prev => {
-      const next = prev.map(item => item.id === editingEvent.id ? editingEvent : item);
-      try {
-        localStorage.setItem('memora_events', JSON.stringify(next));
-      } catch {}
-      broadcastRealtime('EVENT_UPDATED', editingEvent);
-      return next;
+    updateStoredEvent({
+      id: editingEvent.id,
+      name: editingEvent.name,
+      location: editingEvent.venue,
+      date: editingEvent.date,
+      eventType: editingEvent.eventType,
+      themeColor: editingEvent.themeColor,
+      status: editingEvent.status,
     });
+    setEvents(prev => prev.map(item => item.id === editingEvent.id ? editingEvent : item));
+    broadcastRealtime('EVENT_UPDATED', editingEvent);
     setEditingEvent(null);
     showToast(`Updated "${editingEvent.name}" settings.`);
   };
@@ -247,8 +245,6 @@ export default function EventOrganizerEventsPage() {
             <span className="font-mono text-[11px] uppercase tracking-[0.25em] text-primary font-medium">
               Events
             </span>
-            <span className="text-muted-foreground/30">•</span>
-            <RealtimeStatusBadge />
           </div>
           <h1 className="font-display text-4xl sm:text-5xl font-light text-foreground tracking-tight mt-1">
             Photobooth Events
@@ -350,7 +346,7 @@ export default function EventOrganizerEventsPage() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search Maria's Wedding, BGC, Manila..."
+            placeholder="Search events by name, venue, or slug..."
             className="w-full pl-10 pr-4 py-2 bg-secondary/50 border border-border/70 rounded-xl text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground font-mono shadow-2xs transition-all"
           />
         </div>
@@ -396,13 +392,11 @@ export default function EventOrganizerEventsPage() {
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {/* Status badge */}
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono uppercase font-semibold ${
-                      event.status === 'active'
-                        ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30'
-                        : 'bg-secondary text-muted-foreground border border-border/60'
-                    }`}>
-                      {event.status}
-                    </span>
+                    {event.status !== 'active' && (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono uppercase font-semibold bg-secondary text-muted-foreground border border-border/60">
+                        {event.status}
+                      </span>
+                    )}
 
                     {/* Plan Entitlement Badge */}
                     {isStudioCovered ? (

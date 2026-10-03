@@ -65,9 +65,3 @@ Route::middleware('throttle:api')->group(function () {
 });
 Route::post('/events/{slug}/photos', [PhotoController::class, 'store'])
     ->middleware('throttle:uploads');
-
-// Public Checkout Simulation & Testing Endpoints
-Route::middleware('throttle:api')->group(function () {
-    Route::post('/checkout/simulate-pro', [CheckoutController::class, 'createProCheckout']);
-    Route::post('/checkout/simulate-confirm', [CheckoutController::class, 'confirmPayment']);
-});

@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { useRealtime, RealtimeStatusBadge } from '@/context/RealtimeContext';
 import { useModal } from '@/context/ModalContext';
+import { getScopedEvents, getCurrentUser } from '@/lib/userEvents';
+import { isAdminRecord } from '@/lib/adminRecords';
 
 interface StoredEvent {
   id: string;
@@ -39,21 +41,22 @@ export default function StoragePage() {
 
   const loadStorageData = React.useCallback(() => {
     try {
-      let total = 0;
-      const storedEvents = localStorage.getItem('memora_events');
-      if (storedEvents) {
-        const parsed = JSON.parse(storedEvents);
-        if (Array.isArray(parsed)) {
-          setEvents(parsed);
-          total = parsed.reduce((sum: number, ev: StoredEvent) => sum + (ev.totalPhotos || ev.photosCount || ev.photoCount || 0), 0);
-        }
-      }
+      const u = getCurrentUser();
+      const isAdmin = isAdminRecord(u);
+      const userScoped = getScopedEvents(u);
+      setEvents(userScoped);
 
+      let total = userScoped.reduce((sum: number, ev: StoredEvent) => sum + (ev.totalPhotos || ev.photosCount || ev.photoCount || 0), 0);
+
+      const allowedSlugs = new Set(userScoped.map((e: any) => (e.slug || '').toLowerCase()));
       const storedPhotos = localStorage.getItem('memora_gallery_photos');
       if (storedPhotos) {
         const parsedP = JSON.parse(storedPhotos);
-        if (Array.isArray(parsedP) && parsedP.length > total) {
-          total = parsedP.length;
+        if (Array.isArray(parsedP)) {
+          const userPhotosCount = isAdmin ? parsedP.length : parsedP.filter((p: any) => allowedSlugs.has((p.eventSlug || '').toLowerCase())).length;
+          if (userPhotosCount > total) {
+            total = userPhotosCount;
+          }
         }
       }
 
@@ -109,8 +112,6 @@ export default function StoragePage() {
             <span className="font-mono text-[11px] uppercase tracking-[0.25em] text-primary font-medium">
               Storage & Backup
             </span>
-            <span className="text-muted-foreground/30">•</span>
-            <RealtimeStatusBadge />
           </div>
           <h1 className="font-display text-4xl sm:text-5xl font-light text-foreground tracking-tight mt-1">
             Cloud Storage & Backups
@@ -215,22 +216,20 @@ export default function StoragePage() {
               return (
                 <div key={event.id} className="bg-white dark:bg-card border border-border/80 rounded-3xl p-6 space-y-4 shadow-xs ring-1 ring-border/20">
                   <div className="flex items-center justify-between">
-                    <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-mono border uppercase font-semibold ${
-                      event.status === 'active'
-                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/25'
-                        : 'bg-secondary text-muted-foreground border-border/60'
-                    }`}>
-                      {event.status === 'active' ? 'Live Event' : 'Archived'}
-                    </span>
+                    {event.status === 'archived' ? (
+                      <span className="px-2.5 py-0.5 rounded-full text-[9px] font-mono border uppercase font-semibold bg-secondary text-muted-foreground border-border/60">
+                        Archived
+                      </span>
+                    ) : <span />}
                     <span className="text-xs font-mono text-muted-foreground">{eventMB} MB</span>
                   </div>
                   <h4 className="font-display text-xl text-foreground font-light">{event.name || event.title}</h4>
                   <p className="text-xs text-muted-foreground leading-relaxed font-light">
                     {eventPhotos} photo strips and guest portraits.
                   </p>
-                  <div className="pt-3 border-t border-border/60 flex items-center justify-between text-xs font-mono text-emerald-600 dark:text-emerald-400 font-medium">
-                    <span>{event.status === 'active' ? 'Syncing' : 'Saved'}</span>
-                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  <div className="pt-3 border-t border-border/60 flex items-center justify-between text-xs font-mono text-muted-foreground">
+                    <span>Cloud Storage</span>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-muted-foreground/60" />
                   </div>
                 </div>
               );

@@ -1,5 +1,7 @@
 'use client';
 
+import { isAdminRole } from '@/types/user';
+
 export interface RealBoothRecord {
   id: string;
   eventName: string;
@@ -76,6 +78,72 @@ const STORAGE_KEYS = {
   CAPTURED_PHOTOS: 'memora_captured_photos_count',
 };
 
+// --- EVENTS SANITIZATION ---
+// NOTE: Strictly no sample records or seeded demo events. Real events only.
+export function isSampleEvent(event: any): boolean {
+  if (!event) return true;
+
+  const id = String(event.id || '').toLowerCase().trim();
+  const name = String(event.name || event.title || '').toLowerCase().trim();
+  const slug = String(event.slug || '').toLowerCase().trim();
+  const venue = String(event.location || event.venue || '').toLowerCase().trim();
+
+  // 1. Explicit mock identifiers
+  if (id.startsWith('sample-') || id.startsWith('mock-') || id.startsWith('demo-')) {
+    return true;
+  }
+
+  // 2. Known sample event names from earlier mock states
+  const sampleNameSubstrings = [
+    'maria & juan',
+    'maria and juan',
+    'juan & maria',
+    'juan and maria',
+    "maria's wedding",
+    "maria's birthday",
+    'marias wedding',
+    'marias birthday',
+    'nicosnap studio gala',
+    'nicosnap studio gala vip',
+    'sample event',
+    'demo event',
+    'mock event',
+  ];
+
+  if (sampleNameSubstrings.some((kw) => name.includes(kw))) {
+    return true;
+  }
+
+  // 3. Known sample slugs
+  const sampleSlugs = [
+    'maria-juan-wedding',
+    'maria-juan-wedding-2026',
+    'juan-maria-wedding',
+    'marias-wedding',
+    'marias-birthday',
+    'marias-birthday-celebration',
+    'nicosnap-studio-gala',
+    'nicosnap-studio-gala-vip',
+    'sample-event',
+    'demo-event',
+  ];
+
+  if (sampleSlugs.some((s) => slug.includes(s))) {
+    return true;
+  }
+
+  // 4. Known sample venues from demo presets
+  if (
+    venue.includes('the grand ballroom, manila') ||
+    venue.includes('rooftop lounge, bgc') ||
+    venue.includes('ayala museum, makati')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 // --- EVENTS & BOOTHS ---
 export function getRealBooths(): RealBoothRecord[] {
   if (typeof window === 'undefined') return [];
@@ -85,7 +153,12 @@ export function getRealBooths(): RealBoothRecord[] {
     const events = JSON.parse(raw);
     if (!Array.isArray(events)) return [];
 
-    return events.map((e: any, idx: number) => ({
+    const realEvents = events.filter((e: any) => !isSampleEvent(e));
+    if (realEvents.length !== events.length) {
+      localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(realEvents));
+    }
+
+    return realEvents.map((e: any, idx: number) => ({
       id: e.id ? `KB-${e.id.toString().slice(-4)}` : `KB-100${idx + 1}`,
       eventName: e.name || 'Untitled Event',
       venue: e.location || 'Online / Hybrid Venue',
@@ -122,23 +195,19 @@ export function saveRealBooths(booths: RealBoothRecord[]): void {
   } catch {}
 }
 
-// Helper to determine if a record or user is an administrator
+// Determines administrator access. Based strictly on the account role issued by the backend,
+// never on email or display name (anyone can register an email containing "admin").
 export function isAdminRecord(u: any): boolean {
   if (!u) return false;
   const role = String(u.role || '').toLowerCase().trim();
-  const email = String(u.email || '').toLowerCase().trim();
-  const name = String(u.name || u.host || '').toLowerCase().trim();
+  return isAdminRole(role) || role === 'administrator';
+}
 
-  return (
-    role === 'admin' ||
-    role === 'administrator' ||
-    role === 'superadmin' ||
-    email.startsWith('admin@') ||
-    email.includes('admin') ||
-    name === 'admin' ||
-    name === 'administrator' ||
-    name.startsWith('admin')
-  );
+// Ledger-only helper: hides transactions whose payer label marks them as admin-issued.
+// Not used for access control.
+export function isAdminHostName(host?: string): boolean {
+  const name = String(host || '').toLowerCase().trim();
+  return name === 'admin' || name === 'administrator' || name.startsWith('admin');
 }
 
 // --- USERS / ORGANIZERS ---
@@ -358,7 +427,7 @@ export function getRealTransactions(): RealTransaction[] {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     // Strictly exclude any transactions from administrators
-    return parsed.filter(t => !isAdminRecord({ name: t.host, role: '', email: '' }));
+    return parsed.filter(t => !isAdminHostName(t.host));
   } catch {
     return [];
   }
@@ -377,7 +446,7 @@ export function recordRealTransaction(tx: Omit<RealTransaction, 'id' | 'date'>):
     }
 
     // Also do not record if host indicates admin
-    if (isAdminRecord({ name: tx.host, role: '', email: '' })) {
+    if (isAdminHostName(tx.host)) {
       return;
     }
 

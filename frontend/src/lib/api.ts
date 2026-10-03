@@ -8,7 +8,8 @@ export const apiClient = axios.create({
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
-  withCredentials: true,
+  // Auth uses Bearer tokens (see interceptor below), not cookies
+  withCredentials: false,
 });
 
 // Request interceptor to attach Bearer token if stored

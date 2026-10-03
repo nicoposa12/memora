@@ -20,6 +20,8 @@ import {
 import { useRealtime, RealtimeStatusBadge } from '@/context/RealtimeContext';
 import { broadcastRealtime } from '@/lib/realtime';
 import { useModal } from '@/context/ModalContext';
+import { getScopedEvents, getCurrentUser } from '@/lib/userEvents';
+import { isAdminRecord } from '@/lib/adminRecords';
 
 interface PhotoItem {
   id: string;
@@ -44,22 +46,41 @@ export default function MasterGalleryPage() {
 
   const loadGalleryData = React.useCallback(() => {
     try {
-      const storedEvents = localStorage.getItem('memora_events');
-      if (storedEvents) {
-        const parsed = JSON.parse(storedEvents);
-        if (Array.isArray(parsed)) {
-          setEventsList(parsed.map((e: any) => ({
+      const u = getCurrentUser();
+      const isAdmin = isAdminRecord(u);
+      const userScoped = getScopedEvents(u);
+
+      const scopedList = Array.isArray(userScoped)
+        ? userScoped.map((e: any) => ({
             name: e.name || 'Custom Event',
             slug: e.slug || 'event',
-          })));
-        }
-      }
+          }))
+        : [];
+      setEventsList(scopedList);
+
+      const allowedSlugs = new Set(scopedList.map(e => e.slug.toLowerCase()));
 
       const storedPhotos = localStorage.getItem('memora_gallery_photos');
       if (storedPhotos) {
         const parsedP = JSON.parse(storedPhotos);
         if (Array.isArray(parsedP)) {
-          setPhotos(parsedP);
+          const sampleSlugs = new Set(['maria-juan-wedding', 'maria-juan-wedding-2026', 'juan-maria-wedding', 'marias-wedding', 'marias-birthday', 'marias-birthday-celebration', 'nicosnap-studio-gala', 'nicosnap-studio-gala-vip', 'sample-event']);
+          const cleanPhotos = parsedP.filter((p: any) => {
+            const slug = (p.eventSlug || '').toLowerCase();
+            const name = (p.eventName || '').toLowerCase();
+            if (sampleSlugs.has(slug)) return false;
+            if (name.includes('maria') || name.includes('nicosnap studio gala')) return false;
+            return true;
+          });
+          if (cleanPhotos.length !== parsedP.length) {
+            localStorage.setItem('memora_gallery_photos', JSON.stringify(cleanPhotos));
+          }
+
+          if (isAdmin) {
+            setPhotos(cleanPhotos);
+          } else {
+            setPhotos(cleanPhotos.filter((p: any) => allowedSlugs.has((p.eventSlug || '').toLowerCase())));
+          }
         }
       }
     } catch {}
@@ -114,8 +135,6 @@ export default function MasterGalleryPage() {
             <span className="font-mono text-[11px] uppercase tracking-[0.25em] text-primary font-medium">
               Gallery
             </span>
-            <span className="text-muted-foreground/30">•</span>
-            <RealtimeStatusBadge />
           </div>
           <h1 className="font-display text-4xl sm:text-5xl font-light text-foreground tracking-tight mt-1">
             Photo Gallery

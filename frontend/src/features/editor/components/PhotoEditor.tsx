@@ -135,7 +135,7 @@ export function PhotoEditor({
       const stored = localStorage.getItem('memora_user');
       if (stored) {
         const u = JSON.parse(stored);
-        if (isAdminRole(u?.role) || u?.email?.toLowerCase().includes('admin') || u?.role === 'admin') {
+        if (isAdminRole(u?.role) || u?.role === 'admin') {
           setIsAdminUser(true);
         }
       }

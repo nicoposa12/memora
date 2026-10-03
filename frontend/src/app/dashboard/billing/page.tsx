@@ -34,7 +34,7 @@ export default function BillingPage() {
       const stored = localStorage.getItem('memora_user');
       if (stored) {
         const parsed = JSON.parse(stored);
-        const adminUser = isAdminRole(parsed.role) || parsed.email?.toLowerCase().includes('admin') || parsed.role === 'admin';
+        const adminUser = isAdminRole(parsed.role) || parsed.role === 'admin';
         setIsAdmin(adminUser);
         if (parsed.name) setCustomerName(parsed.name);
 
@@ -65,7 +65,8 @@ export default function BillingPage() {
     setTimeout(() => {
       try {
         const stored = localStorage.getItem('memora_user');
-        const user = stored ? JSON.parse(stored) : { name: customerName, email: 'admin@memora.studio', role: 'admin' };
+        if (!stored) return;
+        const user = JSON.parse(stored);
         
         user.plan = targetPlan;
         user.subscription_plan = targetPlan === 'studio' ? 'studio' : 'free';
@@ -122,7 +123,8 @@ export default function BillingPage() {
   const handleResetToTrial = () => {
     try {
       const stored = localStorage.getItem('memora_user');
-      const user = stored ? JSON.parse(stored) : { name: customerName, email: 'customer@memora.ph' };
+      if (!stored) return;
+      const user = JSON.parse(stored);
       user.plan = 'free';
       user.subscription_plan = 'free';
       user.subscription_status = 'active';
@@ -155,7 +157,6 @@ export default function BillingPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <RealtimeStatusBadge />
           {!isAdmin && (
             <span className={`px-4 py-1.5 rounded-full text-xs font-mono uppercase tracking-wider font-semibold flex items-center gap-2 ${
               isStudioActive

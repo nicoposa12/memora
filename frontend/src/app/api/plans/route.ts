@@ -3,15 +3,9 @@ import fs from 'fs/promises';
 import path from 'path';
 import { DEFAULT_PLANS, PlanConfig } from '@/lib/plans';
 
-// Seed default plans matching Admin Plans & Feature Matrix (2 templates, 5 layouts for Free Trial)
+// Seed default plans matching Admin Plans & Feature Matrix
 const INITIAL_SAVED_PLANS: Record<'free' | 'pro' | 'studio', PlanConfig> = {
   ...DEFAULT_PLANS,
-  free: {
-    ...DEFAULT_PLANS.free,
-    allowedTemplateIds: ['classic_filmstrip', 'vogue_met'],
-    allowedLayoutIds: ['strip4', 'strip3', 'grid2x2', 'filmstrip', 'grid2x3'],
-    templatesUnlocked: '2 Templates Included',
-  },
 };
 
 function getStoragePath(): string {

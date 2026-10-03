@@ -521,8 +521,8 @@ export default function StripTemplatesPage() {
       if (storedUser) {
         const u = JSON.parse(storedUser);
         if (u.role || u.email) {
-          setUserRole(u.role || 'admin');
-          setIsAdmin(isAdminRole(u.role) || u.email?.toLowerCase().includes('admin') || u.role === 'admin');
+          setUserRole(u.role || 'organizer');
+          setIsAdmin(isAdminRole(u.role) || u.role === 'admin');
         }
       }
       const storedTemplates = localStorage.getItem('memora_admin_templates');
@@ -537,23 +537,6 @@ export default function StripTemplatesPage() {
       }
     } catch {}
   }, []);
-
-  const handleToggleAdminDemo = () => {
-    try {
-      const stored = localStorage.getItem('memora_user');
-      const u = stored ? JSON.parse(stored) : {};
-      const newRole = isAdmin ? 'organizer' : 'admin';
-      const updated = {
-        ...u,
-        name: newRole === 'admin' ? 'Chief Administrator' : (u.name || 'Eleanor Vance'),
-        email: newRole === 'admin' ? 'admin@memora.studio' : (u.email || 'organizer@memora.studio'),
-        role: newRole,
-      };
-      localStorage.setItem('memora_user', JSON.stringify(updated));
-      setUserRole(newRole);
-      setIsAdmin(newRole === 'admin');
-    } catch {}
-  };
 
   const current = configs[activeTier];
 
@@ -720,7 +703,6 @@ export default function StripTemplatesPage() {
               {isAdmin ? <Sparkles className="w-3 h-3" /> : <ShieldCheck className="w-3 h-3 text-primary" />}
               <span>{isAdmin ? 'Admin Mode' : 'Organizer View'}</span>
             </span>
-            <RealtimeStatusBadge />
           </div>
           <h1 className="font-display text-4xl sm:text-5xl font-light text-foreground tracking-tight mt-1">
             {isAdmin ? 'Templates & Frame Styles' : 'Photo Strip Templates'}
@@ -734,13 +716,6 @@ export default function StripTemplatesPage() {
 
         {isAdmin ? (
           <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={handleToggleAdminDemo}
-              className="px-4 py-2 rounded-full bg-secondary/80 hover:bg-secondary border border-border/80 text-xs font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground transition-all cursor-pointer shadow-2xs"
-            >
-              Preview Organizer View
-            </button>
             <button
               onClick={handleResetDefaults}
               className="px-5 py-2.5 rounded-full border border-border/80 hover:bg-secondary bg-white dark:bg-card text-xs font-mono uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
@@ -762,14 +737,6 @@ export default function StripTemplatesPage() {
               <Lock className="w-3.5 h-3.5 text-primary" />
               <span>Managed by Admin</span>
             </div>
-            <button
-              type="button"
-              onClick={handleToggleAdminDemo}
-              className="px-4 py-2 rounded-full bg-secondary hover:bg-foreground hover:text-background border border-border/80 text-xs font-mono uppercase tracking-wider transition-all font-medium text-foreground cursor-pointer shadow-2xs"
-              title="Switch to Admin role to edit templates"
-            >
-              Switch to Admin Mode
-            </button>
           </div>
         )}
       </div>
@@ -886,13 +853,6 @@ export default function StripTemplatesPage() {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={handleToggleAdminDemo}
-            className="px-4 py-2 rounded-full bg-secondary hover:bg-foreground hover:text-background border border-border/80 text-[10px] font-mono uppercase tracking-wider transition-all font-semibold shrink-0 cursor-pointer shadow-2xs"
-          >
-            Switch to Admin Mode
-          </button>
         </div>
       )}
 
@@ -950,13 +910,6 @@ export default function StripTemplatesPage() {
                 No active templates were found in the library. Templates created by administrators will automatically appear here.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={handleToggleAdminDemo}
-              className="px-4 py-2 rounded-full bg-secondary hover:bg-foreground hover:text-background border border-border/80 text-xs font-mono uppercase tracking-wider transition-all font-medium text-foreground cursor-pointer shadow-2xs mt-2"
-            >
-              Switch to Admin to Create Templates
-            </button>
           </div>
         ) : (
           <div>
@@ -1184,18 +1137,6 @@ export default function StripTemplatesPage() {
                     ? 'Free trial strips include the Memora watermark. Upgrade to PRO for clean, watermark-free photo downloads.'
                     : 'Watermarks are removed. All guest photos and strips download cleanly without logos.'}
                 </p>
-              </div>
-
-              {/* Callout button to test Admin */}
-              <div className="p-4 rounded-2xl bg-secondary/30 border border-border/60 flex items-center justify-between gap-3 text-xs font-mono">
-                <span className="text-muted-foreground">Want to edit templates, colors, and layouts?</span>
-                <button
-                  type="button"
-                  onClick={handleToggleAdminDemo}
-                  className="px-4 py-2 rounded-full bg-foreground text-background hover:bg-foreground/90 uppercase text-[10px] tracking-wider font-semibold transition-all cursor-pointer shadow-2xs"
-                >
-                  Switch to Admin View
-                </button>
               </div>
             </div>
           ) : (

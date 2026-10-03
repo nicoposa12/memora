@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { useRealtime, RealtimeStatusBadge } from '@/context/RealtimeContext';
 import { useModal } from '@/context/ModalContext';
+import { getScopedEvents, getCurrentUser } from '@/lib/userEvents';
+import { isAdminRecord } from '@/lib/adminRecords';
 
 interface EventRecord {
   id: string;
@@ -91,19 +93,22 @@ export default function AnalyticsPage() {
 
   const loadAnalyticsData = React.useCallback(() => {
     try {
-      const storedEvents = localStorage.getItem('memora_events');
-      if (storedEvents) {
-        const parsed = JSON.parse(storedEvents);
-        if (Array.isArray(parsed)) {
-          setEvents(parsed);
-        }
-      }
+      const u = getCurrentUser();
+      const isAdmin = isAdminRecord(u);
+      const userScoped = getScopedEvents(u);
+      setEvents(userScoped);
+
+      const allowedSlugs = new Set(userScoped.map((e: any) => (e.slug || '').toLowerCase()));
 
       const storedPhotos = localStorage.getItem('memora_gallery_photos');
       if (storedPhotos) {
         const parsedP = JSON.parse(storedPhotos);
         if (Array.isArray(parsedP)) {
-          setPhotos(parsedP);
+          if (isAdmin) {
+            setPhotos(parsedP);
+          } else {
+            setPhotos(parsedP.filter((p: any) => allowedSlugs.has((p.eventSlug || '').toLowerCase())));
+          }
         }
       }
 
@@ -290,8 +295,6 @@ export default function AnalyticsPage() {
             <span className="font-mono text-[11px] uppercase tracking-[0.25em] text-primary font-medium">
               Event Analytics
             </span>
-            <span className="text-muted-foreground/30">•</span>
-            <RealtimeStatusBadge />
           </div>
           <h1 className="font-display text-4xl sm:text-5xl font-light text-foreground tracking-tight mt-1">
             Event Analytics & Guest Insights

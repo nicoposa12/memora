@@ -29,7 +29,7 @@ function StudioCheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [userName, setUserName] = useState('Nico');
+  const [userName, setUserName] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState<'gcash' | 'maya' | 'card'>('gcash');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -41,16 +41,10 @@ function StudioCheckoutContent() {
       if (stored) {
         const u = JSON.parse(stored);
         if (u.name) setUserName(u.name.split(' ')[0]);
-        const adminUser = isAdminRole(u.role) || u.email?.toLowerCase().includes('admin') || u.role === 'admin';
+        const adminUser = isAdminRole(u.role) || u.role === 'admin';
         setIsAdmin(!!adminUser);
       } else {
-        localStorage.setItem('memora_token', 'session_' + Date.now());
-        localStorage.setItem('memora_user', JSON.stringify({
-          name: 'Nico Snap',
-          email: 'nico@nicosnap.com',
-          role: 'organizer',
-          plan: 'free',
-        }));
+        router.push('/login?redirect=/checkout/studio');
       }
     } catch {}
   }, []);
@@ -66,11 +60,13 @@ function StudioCheckoutContent() {
         const graceDate = isAdmin ? '2099-12-31' : new Date(now.getTime() + 37 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
         // 1. Update localStorage user
-        let user: any = { name: userName, email: 'nico@nicosnap.com' };
-        try {
-          const stored = localStorage.getItem('memora_user');
-          if (stored) user = JSON.parse(stored);
-        } catch {}
+        const stored = localStorage.getItem('memora_user');
+        if (!stored) {
+          setIsProcessing(false);
+          router.push('/login?redirect=/checkout/studio');
+          return;
+        }
+        const user: any = JSON.parse(stored);
 
         user.subscription_plan = 'studio';
         user.subscription_status = 'active';

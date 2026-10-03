@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { RealtimeStatusBadge, useRealtime } from '@/context/RealtimeContext';
+import { getScopedEvents } from '@/lib/userEvents';
 
 interface DashboardHeaderProps {
   onOpenMobileMenu: () => void;
@@ -30,12 +31,11 @@ export function DashboardHeader({ onOpenMobileMenu }: DashboardHeaderProps) {
     }, 1000);
 
     try {
-      const stored = localStorage.getItem('memora_events');
-      if (stored) {
-        const events = JSON.parse(stored);
-        if (Array.isArray(events) && events.length > 0 && events[0].slug) {
-          setLiveBoothHref(`/e/${events[0].slug}`);
-        }
+      const events = getScopedEvents();
+      if (Array.isArray(events) && events.length > 0 && events[0].slug) {
+        setLiveBoothHref(`/e/${events[0].slug}`);
+      } else {
+        setLiveBoothHref('/dashboard/booths');
       }
     } catch {}
 
@@ -45,14 +45,11 @@ export function DashboardHeader({ onOpenMobileMenu }: DashboardHeaderProps) {
   // Update live booth link in real time if events are created or updated
   useRealtime(['EVENT_CREATED', 'EVENT_DELETED', 'EVENT_UPDATED'], () => {
     try {
-      const stored = localStorage.getItem('memora_events');
-      if (stored) {
-        const events = JSON.parse(stored);
-        if (Array.isArray(events) && events.length > 0 && events[0].slug) {
-          setLiveBoothHref(`/e/${events[0].slug}`);
-        } else {
-          setLiveBoothHref('/dashboard/booths');
-        }
+      const events = getScopedEvents();
+      if (Array.isArray(events) && events.length > 0 && events[0].slug) {
+        setLiveBoothHref(`/e/${events[0].slug}`);
+      } else {
+        setLiveBoothHref('/dashboard/booths');
       }
     } catch {}
   });
@@ -151,9 +148,6 @@ export function DashboardHeader({ onOpenMobileMenu }: DashboardHeaderProps) {
           </div>
         )}
 
-        {/* Realtime Status Indicator Badge */}
-        <RealtimeStatusBadge className="hidden sm:inline-flex" />
-
         {/* Test Live Booth Quick Link */}
         <Link 
           href={liveBoothHref} 
@@ -163,15 +157,6 @@ export function DashboardHeader({ onOpenMobileMenu }: DashboardHeaderProps) {
           <Camera className="w-3.5 h-3.5 text-primary" />
           <span>Live Booth</span>
           <ExternalLink className="w-3 h-3 opacity-60" />
-        </Link>
-
-        {/* New Event Button */}
-        <Link href="/dashboard/events/create">
-          <button className="px-5 py-2 bg-foreground hover:bg-foreground/90 text-background rounded-full text-[11px] sm:text-xs font-mono uppercase tracking-[0.14em] font-medium transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-[0.98]">
-            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span className="hidden sm:inline">New Event</span>
-            <span className="sm:hidden">New</span>
-          </button>
         </Link>
       </div>
     </header>

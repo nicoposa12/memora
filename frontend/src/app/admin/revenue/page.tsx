@@ -15,6 +15,7 @@ import {
   getRealTransactions, 
   getRealCustomers, 
   isAdminRecord,
+  isAdminHostName,
   RealTransaction, 
   RealCustomerRecord 
 } from '@/lib/adminRecords';
@@ -36,7 +37,7 @@ export default function AdminRevenuePage() {
 
   // Strictly filter out administrator accounts from revenue, subscribers, and transaction records
   const organizerCustomers = customers.filter(c => !isAdminRecord(c));
-  const organizerTransactions = transactions.filter(t => !isAdminRecord({ name: t.host }));
+  const organizerTransactions = transactions.filter(t => !isAdminHostName(t.host));
 
   const proCount = organizerCustomers.filter(c => c.tier === 'Studio Pro' || c.tier === 'STUDIO').length;
   const passCount = organizerCustomers.filter(c => c.tier === 'Event Pass' || c.tier === 'PRO').length;

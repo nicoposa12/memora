@@ -30,7 +30,8 @@ import { apiClient } from '@/lib/api';
 import { recordRealTransaction, recordRealAuditLog } from '@/lib/adminRecords';
 import { generateEventSlug } from '@/lib/utils';
 import { isAdminRole } from '@/types/user';
-import { EVENT_TYPES_LIST, getEventLabel } from '@/types';
+import { EVENT_TYPES_LIST, getEventLabel, EventType } from '@/types';
+import { EventTypeSelectWithPreview } from '@/features/events/components/EventTypeSelectWithPreview';
 
 function ProCheckoutContent() {
   const router = useRouter();
@@ -43,9 +44,9 @@ function ProCheckoutContent() {
   // Event Form State
   const [formData, setFormData] = useState({
     name: searchParams.get('name') || '',
-    date: searchParams.get('date') || '2026-12-20',
+    date: searchParams.get('date') || new Date().toISOString().split('T')[0],
     eventType: searchParams.get('type') || 'wedding',
-    location: searchParams.get('location') || 'The Grand Ballroom, Manila',
+    location: searchParams.get('location') || '',
   });
 
   const [formError, setFormError] = useState<string | null>(null);
@@ -70,21 +71,12 @@ function ProCheckoutContent() {
       const stored = localStorage.getItem('memora_user');
       if (stored) {
         const u = JSON.parse(stored);
-        const adminUser = isAdminRole(u?.role) || u?.email?.toLowerCase().includes('admin') || u?.role === 'admin';
+        const adminUser = isAdminRole(u?.role) || u?.role === 'admin';
         setIsAdmin(!!adminUser);
       }
-      const token = localStorage.getItem('memora_token');
-      // If user is not logged in, prompt or maintain session
-      if (!token) {
-        localStorage.setItem('memora_token', 'session_' + Date.now());
-        if (!localStorage.getItem('memora_user')) {
-          localStorage.setItem('memora_user', JSON.stringify({
-            name: 'Juan Dela Cruz',
-            email: 'organizer@memora.ph',
-            role: 'organizer',
-            plan: 'free',
-          }));
-        }
+      // Purchasing requires a real signed-in account
+      if (!stored || !localStorage.getItem('memora_token')) {
+        router.push('/login?redirect=' + encodeURIComponent('/checkout/pro' + window.location.search));
       }
     } catch {}
   }, []);
@@ -141,18 +133,33 @@ function ProCheckoutContent() {
 
     setTimeout(async () => {
       try {
-        const slug = generateEventSlug(formData.name || 'Juan & Maria Wedding');
+        const slug = generateEventSlug(formData.name || 'new-pro-event');
         const eventId = 'EVT-' + Date.now().toString().slice(-6);
         const qrToken = 'tok_' + Math.random().toString(36).substring(2, 15);
 
+        let currentOrganizerEmail = '';
+        let currentUserId = '';
+        let currentOrganizerName = isFreeAdmin ? 'System Admin' : 'Organizer';
+        try {
+          const rawUser = localStorage.getItem('memora_user');
+          if (rawUser) {
+            const u = JSON.parse(rawUser);
+            if (u.email) currentOrganizerEmail = u.email;
+            if (u.id) currentUserId = u.id;
+            if (u.name && !isFreeAdmin) currentOrganizerName = u.name;
+          }
+        } catch {}
+
         const newProEvent = {
           id: eventId,
-          name: formData.name || 'Juan & Maria Wedding',
+          name: formData.name || 'New Event',
           slug: slug,
           eventType: formData.eventType,
           date: formData.date,
           location: formData.location,
-          organizerName: isFreeAdmin ? 'System Admin' : 'Organizer',
+          organizerName: currentOrganizerName,
+          organizerEmail: currentOrganizerEmail,
+          userId: currentUserId,
           status: 'active' as const,
           plan: 'pro' as const,
           isPremium: true,
@@ -316,7 +323,7 @@ function ProCheckoutContent() {
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Juan & Maria Wedding"
+                  placeholder="e.g. Santos Anniversary or Smith Reception"
                   className="w-full px-4 py-3 rounded-2xl bg-secondary/50 border border-border/80 text-foreground text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-medium transition-all"
                 />
               </div>
@@ -343,17 +350,10 @@ function ProCheckoutContent() {
                       PRO UNLOCKED
                     </span>
                   </div>
-                  <select
-                    value={formData.eventType}
-                    onChange={(e) => setFormData({ ...formData, eventType: e.target.value })}
-                    className="w-full px-4 py-3 rounded-2xl bg-secondary/50 border border-border/80 text-foreground text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all cursor-pointer"
-                  >
-                    {EVENT_TYPES_LIST.map((evt) => (
-                      <option key={evt.id} value={evt.id}>
-                        {evt.emoji} {evt.label}
-                      </option>
-                    ))}
-                  </select>
+                  <EventTypeSelectWithPreview
+                    value={(formData.eventType || 'wedding') as EventType}
+                    onChange={(newType) => setFormData({ ...formData, eventType: newType })}
+                  />
                 </div>
               </div>
 
@@ -409,7 +409,7 @@ function ProCheckoutContent() {
             <div className="p-4 rounded-2xl bg-secondary/60 border border-border/60 flex items-center justify-between">
               <div>
                 <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Upgrading Event</span>
-                <p className="font-display text-lg text-foreground font-medium">{formData.name || 'Juan & Maria Wedding'}</p>
+                <p className="font-display text-lg text-foreground font-medium">{formData.name || 'New Event'}</p>
                 <p className="text-xs text-muted-foreground">{formData.date} • {getEventLabel(formData.eventType)}</p>
               </div>
               <button
@@ -656,7 +656,7 @@ function ProCheckoutContent() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h3 className="font-display text-2xl sm:text-3xl font-light text-[#faf7f2]">
-                    {createdEvent?.name || formData.name || 'Juan & Maria Wedding'}
+                    {createdEvent?.name || formData.name || 'New Event'}
                   </h3>
                   <p className="font-mono text-xs text-[#faf7f2]/60 mt-1">
                     {createdEvent?.date || formData.date} • {formData.location}
@@ -728,8 +728,8 @@ function ProCheckoutContent() {
               {/* Embedded QR Share Component */}
               <div id="qr-share-section" className="pt-4 border-t border-border/60">
                 <QrShareCard
-                  eventName={createdEvent?.name || formData.name || 'Juan & Maria Wedding'}
-                  eventSlug={createdEvent?.slug || generateEventSlug(formData.name)}
+                  eventName={createdEvent?.name || formData.name || 'New Event'}
+                  eventSlug={createdEvent?.slug || generateEventSlug(formData.name || 'event')}
                   qrToken={createdEvent?.qrToken}
                 />
               </div>

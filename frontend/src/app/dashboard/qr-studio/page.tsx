@@ -15,6 +15,7 @@ import {
   QrCode
 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
+import { getScopedEvents } from '@/lib/userEvents';
 
 export default function QrStudioPage() {
   const [eventsList, setEventsList] = useState<{ name: string; slug: string }[]>([]);
@@ -64,19 +65,16 @@ export default function QrStudioPage() {
         if (c.eventName) setEventName(c.eventName);
         if (c.eventSlug) setEventSlug(c.eventSlug);
       }
-      const stored = localStorage.getItem('memora_events');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const list = parsed.map((e: any) => ({
-            name: e.name || 'Custom Event',
-            slug: e.slug || 'custom-event',
-          }));
-          setEventsList(list);
-          if (!storedConfig) {
-            setEventName(list[0].name);
-            setEventSlug(list[0].slug);
-          }
+      const userScoped = getScopedEvents();
+      if (Array.isArray(userScoped) && userScoped.length > 0) {
+        const list = userScoped.map((e: any) => ({
+          name: e.name || 'Custom Event',
+          slug: e.slug || 'custom-event',
+        }));
+        setEventsList(list);
+        if (!storedConfig) {
+          setEventName(list[0].name);
+          setEventSlug(list[0].slug);
         }
       }
     } catch {}

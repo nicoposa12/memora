@@ -14,6 +14,9 @@ import {
   PlanConfig,
   DEFAULT_PLANS,
   ALL_SYSTEM_TEMPLATES,
+  ALL_PRO_EVENT_TEMPLATES,
+  PRO_EVENT_THEME_TEMPLATES,
+  ALL_EVENT_TYPE_IDS,
   AvailableTemplateOption,
   getTemplateNativeLayoutId,
 } from '@/lib/plans';
@@ -163,6 +166,7 @@ interface RenderStripOptions {
   watermark?: boolean;
   frameColor?: string;
   textColor?: string;
+  templateId?: string;
 }
 
 function drawCanvasSchoolThemeAccents(
@@ -2419,13 +2423,16 @@ async function renderPhotoStrip(opts: RenderStripOptions): Promise<string> {
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
   const isSchoolThemeCanvas = 
-    opts.frameColor === '#0a1424' || 
-    opts.frameColor === '#091424' || 
-    opts.frameColor === '#fdfaf3' ||
-    opts.title.toLowerCase().includes('school') ||
-    opts.title.toLowerCase().includes('academy') ||
-    opts.title.toLowerCase().includes('collegiate') ||
-    opts.title.toLowerCase().includes('yearbook');
+    opts.templateId === 'event_school' ||
+    (!opts.templateId && (
+      opts.frameColor === '#0a1424' || 
+      opts.frameColor === '#091424' || 
+      opts.frameColor === '#fdfaf3' ||
+      opts.title.toLowerCase().includes('school') ||
+      opts.title.toLowerCase().includes('academy') ||
+      opts.title.toLowerCase().includes('collegiate') ||
+      opts.title.toLowerCase().includes('yearbook')
+    ));
 
   const isLightCanvas = isLightColor(opts.frameColor || frame.paper);
   const schoolGold = isLightCanvas ? '#855d10' : '#d4af37';
@@ -2475,66 +2482,84 @@ async function renderPhotoStrip(opts: RenderStripOptions): Promise<string> {
   }
 
   const isBeachThemeCanvas =
-    opts.frameColor === '#fefcf6' ||
-    opts.title.toLowerCase().includes('beach') ||
-    opts.title.toLowerCase().includes('surf') ||
-    opts.title.toLowerCase().includes('bonfire') ||
-    opts.caption.toLowerCase().includes('beach') ||
-    opts.caption.toLowerCase().includes('surf');
+    opts.templateId === 'event_beach' ||
+    (!opts.templateId && (
+      opts.frameColor === '#fefcf6' ||
+      opts.title.toLowerCase().includes('beach') ||
+      opts.title.toLowerCase().includes('surf') ||
+      opts.title.toLowerCase().includes('bonfire') ||
+      opts.caption.toLowerCase().includes('beach') ||
+      opts.caption.toLowerCase().includes('surf')
+    ));
 
   if (isBeachThemeCanvas && cols === 1) {
     drawCanvasBeachThemeAccents(ctx, canvasWidth, canvasHeight, photoRects);
   }
 
   const isPartyThemeCanvas =
-    opts.frameColor === '#0f1117' ||
-    opts.title.toLowerCase().includes('party') ||
-    opts.title.toLowerCase().includes('nightclub') ||
-    opts.title.toLowerCase().includes('dance') ||
-    opts.caption.toLowerCase().includes('party') ||
-    opts.caption.toLowerCase().includes('midnight');
+    opts.templateId === 'event_party' ||
+    (!opts.templateId && (
+      opts.frameColor === '#0f1117' ||
+      opts.title.toLowerCase().includes('party') ||
+      opts.title.toLowerCase().includes('nightclub') ||
+      opts.title.toLowerCase().includes('dance') ||
+      opts.caption.toLowerCase().includes('party') ||
+      opts.caption.toLowerCase().includes('midnight')
+    ));
 
   if (isPartyThemeCanvas && cols === 1) {
     drawCanvasPartyThemeAccents(ctx, canvasWidth, canvasHeight, photoRects);
   }
 
   const isWeddingThemeCanvas =
-    opts.frameColor === '#fcf8f4' ||
-    opts.frameColor === '#fbf8f1' ||
-    opts.title.toLowerCase().includes('wedding') ||
-    opts.title.toLowerCase().includes('matrimony') ||
-    opts.title.toLowerCase().includes('nuptial') ||
-    opts.title.toLowerCase().includes('vow') ||
-    opts.caption.toLowerCase().includes('wedding') ||
-    opts.caption.toLowerCase().includes('reception');
+    opts.templateId === 'event_wedding' ||
+    (!opts.templateId && (
+      opts.frameColor === '#fcf8f4' ||
+      opts.frameColor === '#fbf8f1' ||
+      opts.title.toLowerCase().includes('wedding') ||
+      opts.title.toLowerCase().includes('matrimony') ||
+      opts.title.toLowerCase().includes('nuptial') ||
+      opts.title.toLowerCase().includes('vow') ||
+      opts.caption.toLowerCase().includes('wedding') ||
+      opts.caption.toLowerCase().includes('reception')
+    ));
 
   if (isWeddingThemeCanvas && cols === 1) {
     drawCanvasWeddingThemeAccents(ctx, canvasWidth, canvasHeight, photoRects);
   }
 
   const isBirthdayThemeCanvas =
-    opts.frameColor === '#fffdf9' ||
-    (opts.frameColor === '#ffffff' && (opts.title.toLowerCase().includes('birthday') || opts.caption.toLowerCase().includes('birthday'))) ||
-    opts.title.toLowerCase().includes('birthday') ||
-    opts.title.toLowerCase().includes('bash') ||
-    opts.title.toLowerCase().includes('celebrate') ||
-    opts.caption.toLowerCase().includes('birthday') ||
-    opts.caption.toLowerCase().includes('celebration');
+    opts.templateId === 'event_birthday' ||
+    (!opts.templateId && (
+      opts.frameColor === '#fffdf9' ||
+      (opts.frameColor === '#ffffff' && (opts.title.toLowerCase().includes('birthday') || opts.caption.toLowerCase().includes('birthday'))) ||
+      opts.title.toLowerCase().includes('birthday') ||
+      opts.title.toLowerCase().includes('bash') ||
+      opts.title.toLowerCase().includes('celebrate') ||
+      opts.caption.toLowerCase().includes('birthday') ||
+      opts.caption.toLowerCase().includes('celebration')
+    ));
 
   const isCorporateThemeCanvas =
-    opts.frameColor === '#f8fafc' ||
-    opts.title.toLowerCase().includes('corporate') ||
-    opts.title.toLowerCase().includes('summit') ||
-    opts.title.toLowerCase().includes('gala') ||
-    opts.caption.toLowerCase().includes('corporate') ||
-    opts.caption.toLowerCase().includes('innovation');
+    opts.templateId === 'event_corporate' ||
+    (!opts.templateId && (
+      opts.frameColor === '#f8fafc' ||
+      opts.title.toLowerCase().includes('corporate') ||
+      opts.title.toLowerCase().includes('summit') ||
+      opts.title.toLowerCase().includes('gala') ||
+      opts.caption.toLowerCase().includes('corporate') ||
+      opts.caption.toLowerCase().includes('innovation')
+    ));
 
   const isGraduationThemeCanvas =
-    opts.frameColor === '#0a1128' ||
-    opts.title.toLowerCase().includes('graduation') ||
-    opts.title.toLowerCase().includes('commencement') ||
-    opts.caption.toLowerCase().includes('honors') ||
-    opts.caption.toLowerCase().includes('graduate');
+    opts.templateId === 'event_graduation' ||
+    (!opts.templateId && (
+      opts.frameColor === '#0a1128' ||
+      opts.title.toLowerCase().includes('graduation') ||
+      opts.title.toLowerCase().includes('commencement') ||
+      opts.caption.toLowerCase().includes('honors') ||
+      opts.caption.toLowerCase().includes('graduate')
+    ));
 
   if (isBirthdayThemeCanvas && cols === 1) {
     drawCanvasBirthdayThemeAccents(ctx, canvasWidth, canvasHeight, photoRects);
@@ -2667,13 +2692,16 @@ async function renderPhotoStripGif(opts: RenderStripOptions): Promise<string> {
     ctx.fillRect(0, 0, baseWidth, baseHeight);
 
     const isSchoolThemeCanvas = 
-      opts.frameColor === '#0a1424' || 
-      opts.frameColor === '#091424' || 
-      opts.frameColor === '#fdfaf3' ||
-      opts.title.toLowerCase().includes('school') ||
-      opts.title.toLowerCase().includes('academy') ||
-      opts.title.toLowerCase().includes('collegiate') ||
-      opts.title.toLowerCase().includes('yearbook');
+      opts.templateId === 'event_school' ||
+      (!opts.templateId && (
+        opts.frameColor === '#0a1424' || 
+        opts.frameColor === '#091424' || 
+        opts.frameColor === '#fdfaf3' ||
+        opts.title.toLowerCase().includes('school') ||
+        opts.title.toLowerCase().includes('academy') ||
+        opts.title.toLowerCase().includes('collegiate') ||
+        opts.title.toLowerCase().includes('yearbook')
+      ));
 
     const isLightCanvas = isLightColor(opts.frameColor || frame.paper);
     const schoolGold = isLightCanvas ? '#855d10' : '#d4af37';
@@ -2740,66 +2768,84 @@ async function renderPhotoStripGif(opts: RenderStripOptions): Promise<string> {
     }
 
     const isBeachThemeCanvas =
-      opts.frameColor === '#fefcf6' ||
-      opts.title.toLowerCase().includes('beach') ||
-      opts.title.toLowerCase().includes('surf') ||
-      opts.title.toLowerCase().includes('bonfire') ||
-      opts.caption.toLowerCase().includes('beach') ||
-      opts.caption.toLowerCase().includes('surf');
+      opts.templateId === 'event_beach' ||
+      (!opts.templateId && (
+        opts.frameColor === '#fefcf6' ||
+        opts.title.toLowerCase().includes('beach') ||
+        opts.title.toLowerCase().includes('surf') ||
+        opts.title.toLowerCase().includes('bonfire') ||
+        opts.caption.toLowerCase().includes('beach') ||
+        opts.caption.toLowerCase().includes('surf')
+      ));
 
     if (isBeachThemeCanvas && cols === 1) {
       drawCanvasBeachThemeAccents(ctx, baseWidth, baseHeight, photoRects);
     }
 
     const isPartyThemeCanvas =
-      opts.frameColor === '#0f1117' ||
-      opts.title.toLowerCase().includes('party') ||
-      opts.title.toLowerCase().includes('nightclub') ||
-      opts.title.toLowerCase().includes('dance') ||
-      opts.caption.toLowerCase().includes('party') ||
-      opts.caption.toLowerCase().includes('midnight');
+      opts.templateId === 'event_party' ||
+      (!opts.templateId && (
+        opts.frameColor === '#0f1117' ||
+        opts.title.toLowerCase().includes('party') ||
+        opts.title.toLowerCase().includes('nightclub') ||
+        opts.title.toLowerCase().includes('dance') ||
+        opts.caption.toLowerCase().includes('party') ||
+        opts.caption.toLowerCase().includes('midnight')
+      ));
 
     if (isPartyThemeCanvas && cols === 1) {
       drawCanvasPartyThemeAccents(ctx, baseWidth, baseHeight, photoRects);
     }
 
     const isWeddingThemeCanvas =
-      opts.frameColor === '#fcf8f4' ||
-      opts.frameColor === '#fbf8f1' ||
-      opts.title.toLowerCase().includes('wedding') ||
-      opts.title.toLowerCase().includes('matrimony') ||
-      opts.title.toLowerCase().includes('nuptial') ||
-      opts.title.toLowerCase().includes('vow') ||
-      opts.caption.toLowerCase().includes('wedding') ||
-      opts.caption.toLowerCase().includes('reception');
+      opts.templateId === 'event_wedding' ||
+      (!opts.templateId && (
+        opts.frameColor === '#fcf8f4' ||
+        opts.frameColor === '#fbf8f1' ||
+        opts.title.toLowerCase().includes('wedding') ||
+        opts.title.toLowerCase().includes('matrimony') ||
+        opts.title.toLowerCase().includes('nuptial') ||
+        opts.title.toLowerCase().includes('vow') ||
+        opts.caption.toLowerCase().includes('wedding') ||
+        opts.caption.toLowerCase().includes('reception')
+      ));
 
     if (isWeddingThemeCanvas && cols === 1) {
       drawCanvasWeddingThemeAccents(ctx, baseWidth, baseHeight, photoRects);
     }
 
     const isBirthdayThemeCanvas =
-      opts.frameColor === '#fffdf9' ||
-      (opts.frameColor === '#ffffff' && (opts.title.toLowerCase().includes('birthday') || opts.caption.toLowerCase().includes('birthday'))) ||
-      opts.title.toLowerCase().includes('birthday') ||
-      opts.title.toLowerCase().includes('bash') ||
-      opts.title.toLowerCase().includes('celebrate') ||
-      opts.caption.toLowerCase().includes('birthday') ||
-      opts.caption.toLowerCase().includes('celebration');
+      opts.templateId === 'event_birthday' ||
+      (!opts.templateId && (
+        opts.frameColor === '#fffdf9' ||
+        (opts.frameColor === '#ffffff' && (opts.title.toLowerCase().includes('birthday') || opts.caption.toLowerCase().includes('birthday'))) ||
+        opts.title.toLowerCase().includes('birthday') ||
+        opts.title.toLowerCase().includes('bash') ||
+        opts.title.toLowerCase().includes('celebrate') ||
+        opts.caption.toLowerCase().includes('birthday') ||
+        opts.caption.toLowerCase().includes('celebration')
+      ));
 
     const isCorporateThemeCanvas =
-      opts.frameColor === '#f8fafc' ||
-      opts.title.toLowerCase().includes('corporate') ||
-      opts.title.toLowerCase().includes('summit') ||
-      opts.title.toLowerCase().includes('gala') ||
-      opts.caption.toLowerCase().includes('corporate') ||
-      opts.caption.toLowerCase().includes('innovation');
+      opts.templateId === 'event_corporate' ||
+      (!opts.templateId && (
+        opts.frameColor === '#f8fafc' ||
+        opts.title.toLowerCase().includes('corporate') ||
+        opts.title.toLowerCase().includes('summit') ||
+        opts.title.toLowerCase().includes('gala') ||
+        opts.caption.toLowerCase().includes('corporate') ||
+        opts.caption.toLowerCase().includes('innovation')
+      ));
 
     const isGraduationThemeCanvas =
-      opts.frameColor === '#0a1128' ||
-      opts.title.toLowerCase().includes('graduation') ||
-      opts.title.toLowerCase().includes('commencement') ||
-      opts.caption.toLowerCase().includes('honors') ||
-      opts.caption.toLowerCase().includes('graduate');
+      opts.templateId === 'event_graduation' ||
+      (!opts.templateId && (
+        opts.frameColor === '#0a1128' ||
+        opts.title.toLowerCase().includes('graduation') ||
+        opts.title.toLowerCase().includes('commencement') ||
+        opts.caption.toLowerCase().includes('honors') ||
+        opts.caption.toLowerCase().includes('graduate')
+      ));
 
     if (isBirthdayThemeCanvas && cols === 1) {
       drawCanvasBirthdayThemeAccents(ctx, baseWidth, baseHeight, photoRects);
@@ -3005,15 +3051,27 @@ export function MemoraBooth({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const [matchedEventType, setMatchedEventType] = useState<string | null>(eventType || null);
+  const initialDetectedType = eventType || 
+    ALL_EVENT_TYPE_IDS.find((t) => 
+      eventName.toLowerCase().includes(t) || 
+      exitHref.toLowerCase().includes(`/e/${t}`)
+    ) || null;
+
+  const [matchedEventType, setMatchedEventType] = useState<string | null>(initialDetectedType);
   const [status, setStatus] = useState<'idle' | 'requesting' | 'ready' | 'error'>('idle');
   const [errorKind, setErrorKind] = useState<string | null>(null);
   const [facing, setFacing] = useState<'user' | 'environment'>('user');
   const [hasMultipleCameras, setHasMultipleCameras] = useState<boolean>(false);
 
   const [phase, setPhase] = useState<'intro' | 'shooting' | 'editing'>('intro');
-  const [templateId, setTemplateId] = useState<string>('classic_filmstrip');
-  const [allTemplates, setAllTemplates] = useState<AvailableTemplateOption[]>(ALL_SYSTEM_TEMPLATES);
+  const initialDefaultTemplateId = (initialDetectedType && PRO_EVENT_THEME_TEMPLATES[initialDetectedType]) 
+    ? PRO_EVENT_THEME_TEMPLATES[initialDetectedType].id 
+    : 'classic_filmstrip';
+  const [templateId, setTemplateId] = useState<string>(initialDefaultTemplateId);
+  const [allTemplates, setAllTemplates] = useState<AvailableTemplateOption[]>([
+    ...ALL_PRO_EVENT_TEMPLATES,
+    ...ALL_SYSTEM_TEMPLATES,
+  ]);
   const [showAllTemplates, setShowAllTemplates] = useState<boolean>(false);
   const [layoutId, setLayoutId] = useState<string>('strip3');
   const [filterId, setFilterId] = useState<string>('original');
@@ -3032,6 +3090,8 @@ export function MemoraBooth({
   const [renderError, setRenderError] = useState<string | null>(null);
   const [activePlanConfig, setActivePlanConfig] = useState<PlanConfig>(DEFAULT_PLANS.free);
 
+  const hasUserSelectedTemplateRef = useRef<boolean>(false);
+
   // Load custom templates if configured by admin in localStorage
   useEffect(() => {
     try {
@@ -3039,7 +3099,7 @@ export function MemoraBooth({
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const systemIds = new Set(ALL_SYSTEM_TEMPLATES.map((t) => t.id));
+          const systemIds = new Set([...ALL_PRO_EVENT_TEMPLATES, ...ALL_SYSTEM_TEMPLATES].map((t) => t.id));
           const customTemplates: AvailableTemplateOption[] = parsed
             .filter((p: any) => !systemIds.has(p.id))
             .map((p: any) => ({
@@ -3052,7 +3112,7 @@ export function MemoraBooth({
               description: p.subtitle || 'Custom photobooth strip template',
               category: p.category || 'custom',
             }));
-          setAllTemplates([...ALL_SYSTEM_TEMPLATES, ...customTemplates]);
+          setAllTemplates([...ALL_PRO_EVENT_TEMPLATES, ...ALL_SYSTEM_TEMPLATES, ...customTemplates]);
         }
       }
     } catch {}
@@ -3169,6 +3229,20 @@ export function MemoraBooth({
     };
   }, [eventName]);
 
+  // Set default PRO event template if matchedEventType is present and user hasn't selected another template
+  useEffect(() => {
+    if (!hasUserSelectedTemplateRef.current && matchedEventType && PRO_EVENT_THEME_TEMPLATES[matchedEventType]) {
+      const eventTpl = PRO_EVENT_THEME_TEMPLATES[matchedEventType];
+      if (isTemplateUnlocked(activePlanConfig, eventTpl.id)) {
+        setTemplateId(eventTpl.id);
+        const nativeLayout = getTemplateNativeLayoutId(eventTpl.layout, eventTpl.id);
+        if (nativeLayout && isLayoutUnlocked(activePlanConfig, nativeLayout)) {
+          setLayoutId(nativeLayout);
+        }
+      }
+    }
+  }, [matchedEventType, activePlanConfig]);
+
   // Ensure an unlocked layout and template are chosen on initial load or plan change
   useEffect(() => {
     if (activePlanConfig) {
@@ -3190,12 +3264,24 @@ export function MemoraBooth({
     }
   }, [activePlanConfig, allTemplates, layoutId, templateId]);
 
+  // Separate PRO Event Template and Free Studio Templates
+  const activeProTemplate = React.useMemo(() => {
+    if (matchedEventType && PRO_EVENT_THEME_TEMPLATES[matchedEventType]) {
+      return PRO_EVENT_THEME_TEMPLATES[matchedEventType];
+    }
+    return PRO_EVENT_THEME_TEMPLATES.party;
+  }, [matchedEventType]);
+
   // Only display unlocked templates for the active plan
   const unlockedTemplates = React.useMemo(() => {
     return allTemplates.filter((t) => isTemplateUnlocked(activePlanConfig, t.id));
   }, [allTemplates, activePlanConfig]);
 
-  const visibleTemplates = showAllTemplates || unlockedTemplates.length <= 12 ? unlockedTemplates : unlockedTemplates.slice(0, 12);
+  const freeTemplates = React.useMemo(() => {
+    return allTemplates.filter((t) => !t.id.startsWith('event_') && isTemplateUnlocked(activePlanConfig, t.id));
+  }, [allTemplates, activePlanConfig]);
+
+  const visibleFreeTemplates = showAllTemplates || freeTemplates.length <= 6 ? freeTemplates : freeTemplates.slice(0, 6);
 
   // Only display unlocked strip layouts for the active plan
   const unlockedLayouts = React.useMemo(() => {
@@ -3204,45 +3290,35 @@ export function MemoraBooth({
 
   const selectedTemplate = allTemplates.find((t) => t.id === templateId) || ALL_SYSTEM_TEMPLATES[0];
   const isLight = isLightColor(selectedTemplate.frameColor);
+
+  // Event theme is ONLY activated when the dedicated PRO Event Template is selected
   const isSchoolTheme = 
-    selectedTemplate.category === 'school' || 
-    selectedTemplate.id === 'ivy_collegiate' || 
-    selectedTemplate.id === 'yearbook_alumni' || 
-    matchedEventType === 'school';
+    selectedTemplate.id === 'event_school' || 
+    selectedTemplate.category === 'school_event';
 
   const isBeachTheme =
-    selectedTemplate.category === 'beach' ||
-    selectedTemplate.id?.includes('beach') ||
-    matchedEventType === 'beach';
+    selectedTemplate.id === 'event_beach' ||
+    selectedTemplate.category === 'beach_event';
 
   const isPartyTheme =
-    selectedTemplate.category === 'party' ||
-    selectedTemplate.id?.includes('party') ||
-    selectedTemplate.id === 'nightclub' ||
-    matchedEventType === 'party';
+    selectedTemplate.id === 'event_party' ||
+    selectedTemplate.category === 'party_event';
 
   const isWeddingTheme =
-    selectedTemplate.category === 'wedding' ||
-    selectedTemplate.id?.includes('wedding') ||
-    selectedTemplate.id === 'versailles_baroque' ||
-    selectedTemplate.id === 'rose_romance' ||
-    selectedTemplate.id === 'hamptons_linen' ||
-    matchedEventType === 'wedding';
+    selectedTemplate.id === 'event_wedding' ||
+    selectedTemplate.category === 'wedding_event';
 
   const isBirthdayTheme =
-    selectedTemplate.category === 'birthday' ||
-    selectedTemplate.id?.includes('birthday') ||
-    matchedEventType === 'birthday';
+    selectedTemplate.id === 'event_birthday' ||
+    selectedTemplate.category === 'birthday_event';
 
   const isCorporateTheme =
-    selectedTemplate.category === 'corporate' ||
-    selectedTemplate.id?.includes('corporate') ||
-    matchedEventType === 'corporate';
+    selectedTemplate.id === 'event_corporate' ||
+    selectedTemplate.category === 'corporate_event';
 
   const isGraduationTheme =
-    selectedTemplate.category === 'graduation' ||
-    selectedTemplate.id?.includes('graduation') ||
-    matchedEventType === 'graduation';
+    selectedTemplate.id === 'event_graduation' ||
+    selectedTemplate.category === 'graduation_event';
 
   const isSchoolLight = isSchoolTheme
     ? (selectedTemplate.id === 'yearbook_alumni' || isLightColor(selectedTemplate.frameColor))
@@ -3265,20 +3341,12 @@ export function MemoraBooth({
     pillBorder: isSchoolLight ? '1px solid #855d10' : '1px solid rgba(212, 175, 55, 0.5)',
   };
 
-  useEffect(() => {
-    if (matchedEventType === 'school') {
-      const schoolTpl = allTemplates.find((t) => t.id === 'ivy_collegiate');
-      if (schoolTpl && isTemplateUnlocked(activePlanConfig, schoolTpl.id)) {
-        setTemplateId(schoolTpl.id);
-      }
-    }
-  }, [matchedEventType, allTemplates, activePlanConfig]);
-
   const isTemplateActiveUnlocked = isTemplateUnlocked(activePlanConfig, templateId);
   const isLayoutActiveUnlocked = isLayoutUnlocked(activePlanConfig, layoutId);
   const isShootable = isTemplateActiveUnlocked && isLayoutActiveUnlocked;
 
   const handleSelectTemplate = (tpl: AvailableTemplateOption) => {
+    hasUserSelectedTemplateRef.current = true;
     setTemplateId(tpl.id);
     const nativeLayout = getTemplateNativeLayoutId(tpl.layout, tpl.id);
     if (nativeLayout && isLayoutUnlocked(activePlanConfig, nativeLayout)) {
@@ -3492,6 +3560,7 @@ export function MemoraBooth({
       watermark: activePlanConfig.watermark !== false,
       frameColor: selectedTemplate.frameColor,
       textColor: selectedTemplate.textColor,
+      templateId: selectedTemplate.id,
     };
 
     renderPhotoStrip(stripOptions)
@@ -3572,19 +3641,61 @@ export function MemoraBooth({
                   </p>
                 </div>
 
-                {/* Template & Frame Style Selector */}
+                {/* 1. PRO Event Template Selector */}
+                {activeProTemplate && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-cream/50 flex items-center gap-1.5">
+                        <Sparkles className="w-3 h-3 text-primary" />
+                        <span>PRO Event Template</span>
+                      </p>
+                      <span className="font-mono text-[9px] text-cream/40 uppercase tracking-wider">
+                        PRO Pass
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSelectTemplate(activeProTemplate)}
+                      className={`w-full relative flex items-center gap-3 rounded-2xl p-2.5 text-left text-xs transition-all cursor-pointer ${
+                        templateId === activeProTemplate.id
+                          ? 'bg-cream/15 text-cream border border-cream/50 ring-2 ring-primary/50 shadow-md'
+                          : 'bg-cream/5 text-cream/70 border border-white/5 hover:bg-cream/10'
+                      }`}
+                      title={activeProTemplate.name}
+                    >
+                      <span
+                        className="w-3.5 h-3.5 rounded-full shrink-0 border border-white/20 shadow-xs"
+                        style={{ backgroundColor: activeProTemplate.frameColor }}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-xs truncate leading-snug">{activeProTemplate.name}</span>
+                          <span className="text-[10px] font-mono text-cream/45 truncate">
+                            • {activeProTemplate.layout}
+                          </span>
+                        </div>
+                        <div className="text-[10px] font-mono text-cream/45 truncate">
+                          {activeProTemplate.description}
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                )}
+
+                {/* 2. Free Studio Templates Selector */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-cream/50 flex items-center gap-1.5">
                       <Palette className="w-3 h-3 text-primary" />
-                      <span>Template</span>
+                      <span>Free Templates</span>
                     </p>
                     <span className="font-mono text-[9px] text-cream/40 uppercase tracking-wider">
-                      {activePlanConfig.name}
+                      All Templates in PRO
                     </span>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {visibleTemplates.map((tpl) => {
+                    {visibleFreeTemplates.map((tpl) => {
                       const isSelected = templateId === tpl.id;
 
                       return (
@@ -3614,7 +3725,7 @@ export function MemoraBooth({
                     })}
                   </div>
 
-                  {unlockedTemplates.length > 6 && (
+                  {freeTemplates.length > 6 && (
                     <div className="flex justify-center mt-2.5">
                       <button
                         type="button"
@@ -3632,7 +3743,7 @@ export function MemoraBooth({
                   )}
                 </div>
 
-                {/* Photo Strip Layout Selector */}
+                {/* 3. Photo Strip Layout Selector */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-cream/50 flex items-center gap-1.5">
@@ -3640,7 +3751,7 @@ export function MemoraBooth({
                       <span>Layout</span>
                     </p>
                     <span className="font-mono text-[9px] text-cream/40 uppercase tracking-wider">
-                      {activeLayout.shots} {activeLayout.shots === 1 ? 'Pose' : 'Poses'}
+                      All Free Strip Layouts
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -4315,8 +4426,11 @@ export function MemoraBooth({
                                 </span>
                               </div>
                             ) : (
-                              <div className="text-[7px] font-mono uppercase tracking-widest opacity-60 mt-0.5" style={{ color: schoolPalette.textSecondary }}>
-                                ✦ ZERO WATERMARK ✦
+                              <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: schoolPalette.textSecondary }}>
+                                <Logo className="w-2.5 h-2.5 shrink-0" />
+                                <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
+                                  MEMORA
+                                </span>
                               </div>
                             )}
                           </>
@@ -4338,8 +4452,11 @@ export function MemoraBooth({
                                 </span>
                               </div>
                             ) : (
-                              <div className="text-[7px] font-mono uppercase tracking-widest opacity-60 mt-0.5" style={{ color: '#0284c7' }}>
-                                ✦ ZERO WATERMARK ✦
+                              <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#0284c7' }}>
+                                <Logo className="w-2.5 h-2.5 shrink-0" />
+                                <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
+                                  MEMORA
+                                </span>
                               </div>
                             )}
                           </>
@@ -4361,8 +4478,11 @@ export function MemoraBooth({
                                 </span>
                               </div>
                             ) : (
-                              <div className="text-[7px] font-mono uppercase tracking-widest opacity-60 mt-0.5" style={{ color: '#ec4899' }}>
-                                ✦ ZERO WATERMARK ✦
+                              <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#ec4899' }}>
+                                <Logo className="w-2.5 h-2.5 shrink-0" />
+                                <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
+                                  MEMORA
+                                </span>
                               </div>
                             )}
                           </>
@@ -4384,8 +4504,11 @@ export function MemoraBooth({
                                 </span>
                               </div>
                             ) : (
-                              <div className="text-[7px] font-mono uppercase tracking-widest opacity-60 mt-0.5" style={{ color: '#b8860b' }}>
-                                ✦ ZERO WATERMARK ✦
+                              <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#b8860b' }}>
+                                <Logo className="w-2.5 h-2.5 shrink-0" />
+                                <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
+                                  MEMORA
+                                </span>
                               </div>
                             )}
                           </>
@@ -4407,8 +4530,11 @@ export function MemoraBooth({
                                 </span>
                               </div>
                             ) : (
-                              <div className="text-[7px] font-mono uppercase tracking-widest opacity-60 mt-0.5" style={{ color: '#d97706' }}>
-                                ✦ ZERO WATERMARK ✦
+                              <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#d97706' }}>
+                                <Logo className="w-2.5 h-2.5 shrink-0" />
+                                <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
+                                  MEMORA
+                                </span>
                               </div>
                             )}
                           </>
@@ -4430,8 +4556,11 @@ export function MemoraBooth({
                                 </span>
                               </div>
                             ) : (
-                              <div className="text-[7px] font-mono uppercase tracking-widest opacity-60 mt-0.5" style={{ color: '#2563eb' }}>
-                                ✦ ZERO WATERMARK ✦
+                              <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#2563eb' }}>
+                                <Logo className="w-2.5 h-2.5 shrink-0" />
+                                <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
+                                  MEMORA
+                                </span>
                               </div>
                             )}
                           </>
@@ -4453,8 +4582,11 @@ export function MemoraBooth({
                                 </span>
                               </div>
                             ) : (
-                              <div className="text-[7px] font-mono uppercase tracking-widest opacity-60 mt-0.5" style={{ color: '#d4af37' }}>
-                                ✦ ZERO WATERMARK ✦
+                              <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#d4af37' }}>
+                                <Logo className="w-2.5 h-2.5 shrink-0" />
+                                <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
+                                  MEMORA
+                                </span>
                               </div>
                             )}
                           </>
@@ -4479,7 +4611,14 @@ export function MemoraBooth({
                                   MEMORA WATERMARK INCLUDED
                                 </span>
                               </div>
-                            ) : null}
+                            ) : (
+                              <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: selectedTemplate.textColor }}>
+                                <Logo className="w-2.5 h-2.5 shrink-0" />
+                                <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
+                                  MEMORA
+                                </span>
+                              </div>
+                            )}
                           </>
                         )}
                       </div>

@@ -178,7 +178,83 @@ export const ALL_SYSTEM_TEMPLATES: AvailableTemplateOption[] = [
   },
 ];
 
-export const ALL_TEMPLATE_IDS = ALL_SYSTEM_TEMPLATES.map(t => t.id);
+export const PRO_EVENT_THEME_TEMPLATES: Record<string, AvailableTemplateOption> = {
+  party: {
+    id: 'event_party',
+    name: 'Pro Event – Party',
+    badge: 'PRO Pass',
+    layout: '3-Photo Strip',
+    frameColor: '#0f1117',
+    textColor: '#f4f4f5',
+    description: 'Party celebration with disco ball, balloons, party poppers, and neon soundwave equalizer',
+    category: 'party_event',
+  },
+  wedding: {
+    id: 'event_wedding',
+    name: 'Pro Event – Wedding',
+    badge: 'PRO Pass',
+    layout: '4-Pose Strip',
+    frameColor: '#fcf8f4',
+    textColor: '#1f1b18',
+    description: 'Botanical ivory frame with golden rings, bouquet, hearts, and floral flourishes',
+    category: 'wedding_event',
+  },
+  birthday: {
+    id: 'event_birthday',
+    name: 'Pro Event – Birthday',
+    badge: 'PRO Pass',
+    layout: '3-Photo Strip',
+    frameColor: '#fffdf9',
+    textColor: '#18181b',
+    description: 'Festive celebration with birthday cake, balloons, sparkles, and bunting banner',
+    category: 'birthday_event',
+  },
+  school: {
+    id: 'event_school',
+    name: 'Pro Event – School',
+    badge: 'PRO Pass',
+    layout: '4-Pose Strip',
+    frameColor: '#0a1424',
+    textColor: '#f6eedb',
+    description: 'Campus navy with gold academic diploma borders, student badges, and stationery accents',
+    category: 'school_event',
+  },
+  beach: {
+    id: 'event_beach',
+    name: 'Pro Event – Beach',
+    badge: 'PRO Pass',
+    layout: '3-Photo Strip',
+    frameColor: '#f0f9ff',
+    textColor: '#0f172a',
+    description: 'Sun-drenched coastal frame with palm leaves, seashells, ocean waves, and starfish',
+    category: 'beach_event',
+  },
+  corporate: {
+    id: 'event_corporate',
+    name: 'Pro Event – Corporate',
+    badge: 'PRO Pass',
+    layout: '4-Pose Strip',
+    frameColor: '#f8fafc',
+    textColor: '#0f172a',
+    description: 'Executive modern frame with skyline footer, trophy cup, and skyscraper accents',
+    category: 'corporate_event',
+  },
+  graduation: {
+    id: 'event_graduation',
+    name: 'Pro Event – Graduation',
+    badge: 'PRO Pass',
+    layout: '4-Pose Strip',
+    frameColor: '#0a1128',
+    textColor: '#fcf8ef',
+    description: 'Midnight navy frame with gilded graduation caps, diploma footer, and honor trophy',
+    category: 'graduation_event',
+  },
+};
+
+export const ALL_PRO_EVENT_TEMPLATES = Object.values(PRO_EVENT_THEME_TEMPLATES);
+export const ALL_PRO_EVENT_TEMPLATE_IDS = ALL_PRO_EVENT_TEMPLATES.map((t) => t.id);
+
+export const ALL_TEMPLATE_IDS = ALL_SYSTEM_TEMPLATES.map((t) => t.id);
 
 export interface AvailableLayoutOption {
   id: string;
@@ -261,6 +337,13 @@ export const ALL_LAYOUT_IDS = ALL_STRIP_LAYOUTS.map(l => l.id);
 export function getTemplateNativeLayoutId(layoutStr?: string, templateId?: string): string {
   if (templateId) {
     const directMap: Record<string, string> = {
+      event_party: 'strip3',
+      event_wedding: 'strip4',
+      event_birthday: 'strip3',
+      event_school: 'strip4',
+      event_beach: 'strip3',
+      event_corporate: 'strip4',
+      event_graduation: 'strip4',
       classic_filmstrip: 'filmstrip',
       marais_darkroom: 'filmstrip',
       marais_analog: 'filmstrip',
@@ -316,10 +399,14 @@ export function isTemplateUnlocked(plan: PlanConfig | undefined, templateId: str
   const allowed = plan.allowedTemplateIds;
   if (!allowed || allowed.length === 0) {
     if (plan.id === 'pro' || plan.id === 'studio') return true;
-    return templateId === 'vogue_met' || templateId === 'classic_filmstrip' || templateId === 'marais_darkroom' || templateId === 'marais_analog';
+    return ALL_TEMPLATE_IDS.includes(templateId);
   }
 
   if (allowed.includes('*') || allowed.includes('all') || allowed.includes(templateId)) {
+    return true;
+  }
+
+  if ((plan.id === 'pro' || plan.id === 'studio') && templateId.startsWith('event_')) {
     return true;
   }
 
@@ -371,20 +458,21 @@ export const DEFAULT_PLANS: Record<'free' | 'pro' | 'studio', PlanConfig> = {
     price: 0,
     priceDisplay: '₱0',
     period: 'single event',
-    summary: 'Standard 3-photo strip for booth testing & private events',
+    summary: 'All 13 studio templates & 7 strip layouts included for booth testing & private events',
     watermark: true,
     maxPhotos: 50,
-    templatesUnlocked: '2 Templates Included',
+    templatesUnlocked: 'All 13 Studio Templates Included',
     filtersUnlocked: '3 Classic Filters',
     downloads: 'Downloads & digital gallery',
     eventCoverage: '1 Single Event',
-    allowedTemplateIds: ['classic_filmstrip', 'vogue_met'],
-    allowedLayoutIds: ['strip4', 'strip3', 'grid2x2', 'filmstrip', 'grid2x3'],
+    allowedTemplateIds: ALL_TEMPLATE_IDS,
+    allowedLayoutIds: ALL_LAYOUT_IDS,
     allowedEventTypes: ['other'],
     gifExport: true,
     features: [
       { id: 'f1', text: '50 photos per event', included: true },
-      { id: 'f2', text: '1 standard 3-photo strip layout', included: true },
+      { id: 'f2', text: 'All 7 free strip layouts included', included: true },
+      { id: 'f_tpl', text: 'All 13 studio templates included', included: true },
       { id: 'f_gif', text: 'Animated Strip GIF generation & export', included: true },
       { id: 'f3', text: '3 vintage & monochrome filters', included: true },
       { id: 'f4', text: 'Includes Memora discreet watermark', included: true },
@@ -399,22 +487,22 @@ export const DEFAULT_PLANS: Record<'free' | 'pro' | 'studio', PlanConfig> = {
     price: 1499,
     priceDisplay: '₱1,499',
     period: 'per event · 1 month access',
-    summary: 'Full event pass with premium templates, zero watermark, and 1-month active access',
+    summary: 'Full event pass with exclusive PRO event templates, zero watermark, and 1-month active access',
     watermark: false,
     maxPhotos: -1,
     templatesUnlocked: 'All Templates & Layouts Unlocked',
     filtersUnlocked: 'Premium Filters & Frames',
     downloads: 'Event gallery & HD downloads',
     eventCoverage: 'Full coverage for School, Beach, Party, Wedding, Birthday, Graduation & Corporate',
-    allowedTemplateIds: ALL_TEMPLATE_IDS,
+    allowedTemplateIds: [...ALL_TEMPLATE_IDS, ...ALL_PRO_EVENT_TEMPLATE_IDS],
     allowedLayoutIds: ALL_LAYOUT_IDS,
     allowedEventTypes: ALL_EVENT_TYPE_IDS,
     gifExport: true,
     features: [
       { id: 'p1', text: 'Unlimited photos for 1 full event', included: true, highlight: true },
       { id: 'p_validity', text: '1-month active event access & live gallery countdown', included: true, highlight: true },
-      { id: 'p_events', text: 'Full coverage for School, Beach, Party, Wedding, Birthday, Graduation & Corporate', included: true, highlight: true },
-      { id: 'p2', text: 'All 7 strip layouts & 10 designer presets', included: true, highlight: true },
+      { id: 'p_events', text: 'Exclusive PRO event templates: Party, Wedding, Birthday, School & more', included: true, highlight: true },
+      { id: 'p2', text: 'All 7 strip layouts & 13 studio templates included', included: true, highlight: true },
       { id: 'p_gif', text: 'Animated Strip GIF generation & export', included: true, highlight: true },
       { id: 'p3', text: 'Zero watermark & custom event header', included: true, highlight: true },
       { id: 'p4', text: 'Premium filters & live countdowns', included: true },
@@ -436,14 +524,14 @@ export const DEFAULT_PLANS: Record<'free' | 'pro' | 'studio', PlanConfig> = {
     filtersUnlocked: 'All Filters & Custom Themes',
     downloads: 'Full High-Resolution Archive & Bulk ZIP',
     eventCoverage: 'Unlimited events across School, Beach, Party, Wedding, Birthday, Graduation & Corporate',
-    allowedTemplateIds: ALL_TEMPLATE_IDS,
+    allowedTemplateIds: [...ALL_TEMPLATE_IDS, ...ALL_PRO_EVENT_TEMPLATE_IDS],
     allowedLayoutIds: ALL_LAYOUT_IDS,
     allowedEventTypes: ALL_EVENT_TYPE_IDS,
     gifExport: true,
     features: [
       { id: 's1', text: 'Unlimited events covered concurrently', included: true, highlight: true },
       { id: 's_events', text: 'Unlimited coverage across School, Beach, Party, Wedding, Birthday, Graduation & Corporate', included: true, highlight: true },
-      { id: 's2', text: 'All 10 templates & custom fonts/colors', included: true, highlight: true },
+      { id: 's2', text: 'All PRO event templates & 13 studio templates', included: true, highlight: true },
       { id: 's_gif', text: 'Animated Strip GIF generation & export', included: true, highlight: true },
       { id: 's3', text: 'Custom studio branding & zero watermark', included: true, highlight: true },
       { id: 's4', text: 'Multi-organizer team access & export analytics', included: true },

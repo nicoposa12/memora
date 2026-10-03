@@ -25,6 +25,8 @@ import {
 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { isClientRole, isAdminRole, getRoleDisplayName, UserRole, ClientPlan } from '@/types/user';
+import { getScopedEvents } from '@/lib/userEvents';
+import { formatFirstName } from '@/lib/utils';
 
 interface DashboardSidebarProps {
   onCloseMobile?: () => void;
@@ -48,17 +50,18 @@ export function DashboardSidebar({ onCloseMobile }: DashboardSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [userName, setUserName] = useState('Studio Organizer');
-  const [userEmail, setUserEmail] = useState('organizer@memora.studio');
+  const [userEmail, setUserEmail] = useState('');
   const [userRole, setUserRole] = useState<UserRole>('client');
   const [userPlan, setUserPlan] = useState<ClientPlan>('event');
   const [firstEventSlug, setFirstEventSlug] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadUserData = () => {
     try {
       const storedUser = localStorage.getItem('memora_user');
       if (storedUser) {
         const parsed = JSON.parse(storedUser);
-        if (parsed.name) setUserName(parsed.name);
+        if (parsed.firstName) setUserName(parsed.firstName);
+        else if (parsed.name) setUserName(formatFirstName(parsed));
         if (parsed.email) setUserEmail(parsed.email);
         if (parsed.role) setUserRole(parsed.role);
         if (parsed.plan) setUserPlan(parsed.plan);
@@ -68,14 +71,19 @@ export function DashboardSidebar({ onCloseMobile }: DashboardSidebarProps) {
     }
 
     try {
-      const storedEvents = localStorage.getItem('memora_events');
-      if (storedEvents) {
-        const events = JSON.parse(storedEvents);
-        if (Array.isArray(events) && events.length > 0 && events[0].slug) {
-          setFirstEventSlug(events[0].slug);
-        }
+      const events = getScopedEvents();
+      if (Array.isArray(events) && events.length > 0 && events[0].slug) {
+        setFirstEventSlug(events[0].slug);
+      } else {
+        setFirstEventSlug(null);
       }
     } catch {}
+  };
+
+  useEffect(() => {
+    loadUserData();
+    window.addEventListener('storage', loadUserData);
+    return () => window.removeEventListener('storage', loadUserData);
   }, []);
 
   const handleLogout = () => {
@@ -119,7 +127,7 @@ export function DashboardSidebar({ onCloseMobile }: DashboardSidebarProps) {
           label: 'Live Kiosk',
           href: firstEventSlug ? `/e/${firstEventSlug}` : '/dashboard/booths',
           icon: Camera,
-          badge: firstEventSlug ? 'Live' : null,
+          badge: null,
           external: !!firstEventSlug,
         },
       ],
@@ -131,7 +139,7 @@ export function DashboardSidebar({ onCloseMobile }: DashboardSidebarProps) {
           label: 'Templates',
           href: '/dashboard/templates',
           icon: Sliders,
-          badge: isAdminRole(userRole) ? 'Admin' : 'Presets',
+          badge: null,
         },
         {
           label: 'QR Codes',

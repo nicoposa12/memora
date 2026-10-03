@@ -12,29 +12,44 @@ import {
   QrCode,
   Crown
 } from 'lucide-react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { QrShareCard } from './QrShareCard';
 import { generateEventSlug } from '@/lib/utils';
 import { EventType, EVENT_TYPES_LIST } from '@/types';
 import { isAdminRole } from '@/types/user';
+import { EventTypeSelectWithPreview } from './EventTypeSelectWithPreview';
+import { getUserEventLimitStatus, EventLimitStatus, getCurrentUser } from '@/lib/userEvents';
 
 export function EventWizard() {
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [hasStudioPlan, setHasStudioPlan] = useState<boolean>(false);
+  const [limitStatus, setLimitStatus] = useState<EventLimitStatus | null>(null);
+  const [isCheckingLimit, setIsCheckingLimit] = useState<boolean>(true);
 
   useEffect(() => {
     try {
-      const storedUser = localStorage.getItem('memora_user');
-      if (storedUser) {
-        const u = JSON.parse(storedUser);
-        const isAdmin = isAdminRole(u.role) || u.email?.toLowerCase().includes('admin') || u.role === 'admin';
-        if (isAdmin || (u.subscription_plan === 'studio' && (u.subscription_status === 'active' || u.subscription_status === 'past_due'))) {
+      const u = getCurrentUser();
+      const status = getUserEventLimitStatus(u);
+      setLimitStatus(status);
+      setIsCheckingLimit(false);
+
+      if (u) {
+        const isAdmin = isAdminRole(u.role) || u.role === 'admin';
+        const isStudio = u.subscription_plan === 'studio' && (u.subscription_status === 'active' || u.subscription_status === 'past_due');
+        const isPro = u.plan === 'pro' || u.subscription_plan === 'pro';
+
+        if (isAdmin || isStudio) {
           setHasStudioPlan(true);
+        }
+        if (isAdmin || isStudio || isPro) {
           setFormData(prev => ({ ...prev, watermark: false, maxPhotosPerGuest: 9999 }));
         }
       }
-    } catch {}
+    } catch {
+      setIsCheckingLimit(false);
+    }
   }, []);
 
   // Form State
@@ -70,6 +85,92 @@ export function EventWizard() {
     { num: 4, label: 'Template', icon: Layout },
     { num: 5, label: 'Publish', icon: QrCode },
   ];
+
+  if (!isCheckingLimit && limitStatus && !limitStatus.allowed) {
+    return (
+      <div className="w-full max-w-2xl mx-auto py-8 px-4 selection:bg-primary/20 selection:text-primary">
+        <div className="bg-card rounded-3xl p-6 sm:p-10 border border-border/80 shadow-xs ring-1 ring-border/30 text-foreground text-center space-y-6 animate-in fade-in duration-300">
+          <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-500 mx-auto shadow-2xs">
+            <Crown className="w-7 h-7" />
+          </div>
+
+          <div className="space-y-2">
+            <span className="text-[10px] font-mono uppercase tracking-[0.25em] px-3 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/25 font-semibold inline-block">
+              {limitStatus.planName} • 1 Event Limit Reached
+            </span>
+            <h2 className="font-display text-3xl sm:text-4xl font-light text-foreground tracking-tight">
+              Event Limit Reached
+            </h2>
+            <p className="text-xs sm:text-sm text-muted-foreground font-light max-w-lg mx-auto leading-relaxed">
+              {limitStatus.isProPass
+                ? 'Your PRO Event Pass includes full coverage for 1 event. You currently have an active event in your workspace.'
+                : (limitStatus.reason || 'You have reached the maximum number of events permitted for your plan.')}
+            </p>
+          </div>
+
+          {/* Active Event Preview */}
+          {limitStatus.existingEventName && (
+            <div className="p-4 sm:p-5 rounded-2xl bg-secondary/50 border border-border/70 text-left space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground font-semibold">
+                  Active Event in Workspace
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 font-semibold uppercase">
+                  1 of 1 Pass Used
+                </span>
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                <div>
+                  <h4 className="font-display text-xl text-foreground font-medium">
+                    {limitStatus.existingEventName}
+                  </h4>
+                  <p className="text-xs font-mono text-muted-foreground mt-0.5">
+                    {limitStatus.existingEventDate ? `Date: ${limitStatus.existingEventDate} • ` : ''}PRO Pass Active • Unlimited Photos • Zero Watermark
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Link
+                    href="/dashboard/events"
+                    className="px-4 py-2 rounded-full bg-card hover:bg-secondary border border-border text-xs font-mono uppercase tracking-wider text-foreground transition-all cursor-pointer shadow-2xs"
+                  >
+                    Manage Event
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Upgrade Card */}
+          <div className="p-5 rounded-2xl bg-primary/5 border border-primary/20 text-left space-y-3">
+            <div className="flex items-center gap-2 text-primary">
+              <Sparkles className="w-4 h-4 shrink-0" />
+              <h4 className="text-xs font-mono font-semibold uppercase tracking-wider">
+                Need to host multiple concurrent events?
+              </h4>
+            </div>
+            <p className="text-xs text-muted-foreground font-light leading-relaxed">
+              Upgrade to <strong>STUDIO Monthly (₱4,999/mo)</strong> to run unlimited concurrent photobooth events, upload custom studio logos, and invite team members.
+            </p>
+            <div className="pt-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+              <Link
+                href="/checkout/studio"
+                className="flex-1 py-2.5 px-5 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-mono uppercase tracking-[0.14em] font-medium transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>Upgrade to Studio (Unlimited Events)</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+              <Link
+                href="/dashboard/events"
+                className="py-2.5 px-5 rounded-full bg-secondary hover:bg-secondary/80 text-foreground text-xs font-mono uppercase tracking-[0.14em] transition-all text-center"
+              >
+                Back to Events
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-2xl mx-auto py-8 px-4 selection:bg-primary/20 selection:text-primary">
@@ -169,19 +270,13 @@ export function EventWizard() {
                       {hasStudioPlan ? 'STUDIO COVERAGE' : 'PRO & STUDIO READY'}
                     </span>
                   </div>
-                  <select
+                  <EventTypeSelectWithPreview
                     value={formData.eventType}
-                    onChange={(e) => setFormData(prev => ({ ...prev, eventType: e.target.value as EventType }))}
-                    className="w-full px-4 py-3 rounded-xl bg-secondary/50 border border-border/70 text-foreground text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary shadow-2xs cursor-pointer"
-                  >
-                    {EVENT_TYPES_LIST.map((evt) => (
-                      <option key={evt.id} value={evt.id}>
-                        {evt.emoji} {evt.label} {evt.tier === 'pro_studio' ? '• Pro & Studio' : ''}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(newType) => setFormData((prev) => ({ ...prev, eventType: newType }))}
+                    hasStudioPlan={hasStudioPlan || limitStatus?.isProPass}
+                  />
                   <p className="text-[11px] text-muted-foreground mt-1.5 font-light">
-                    {EVENT_TYPES_LIST.find(e => e.id === formData.eventType)?.description || 'Photobooth event configuration'}
+                    {EVENT_TYPES_LIST.find((e) => e.id === formData.eventType)?.description || 'Photobooth event configuration'}
                   </p>
                 </div>
 
@@ -392,16 +487,32 @@ export function EventWizard() {
                 type="button"
                 onClick={() => {
                   try {
+                    const freshStatus = getUserEventLimitStatus();
+                    if (!freshStatus.allowed) {
+                      setLimitStatus(freshStatus);
+                      return;
+                    }
+
                     const raw = localStorage.getItem('memora_events');
                     const list = raw ? JSON.parse(raw) : [];
                     let userPlan = 'free';
                     let isPremium = false;
+                    let organizerEmail = '';
+                    let userId = '';
+                    let organizerName = 'Organizer';
+
                     const storedUser = localStorage.getItem('memora_user');
                     if (storedUser) {
                       const u = JSON.parse(storedUser);
-                      const isAdmin = isAdminRole(u.role) || u.email?.toLowerCase().includes('admin') || u.role === 'admin';
+                      if (u.email) organizerEmail = u.email;
+                      if (u.id) userId = u.id;
+                      if (u.name) organizerName = u.name;
+                      const isAdmin = isAdminRole(u.role) || u.role === 'admin';
                       if (isAdmin || (u.subscription_plan === 'studio' && (u.subscription_status === 'active' || u.subscription_status === 'past_due'))) {
                         userPlan = 'studio';
+                        isPremium = true;
+                      } else if (u.plan === 'pro' || u.subscription_plan === 'pro') {
+                        userPlan = 'pro';
                         isPremium = true;
                       }
                     }
@@ -413,7 +524,9 @@ export function EventWizard() {
                       eventType: formData.eventType,
                       date: formData.date,
                       location: formData.location || 'Private Venue',
-                      organizerName: 'Organizer',
+                      organizerName: organizerName,
+                      organizerEmail: organizerEmail,
+                      userId: userId,
                       status: 'active',
                       plan: userPlan,
                       isPremium: isPremium,
@@ -450,8 +563,8 @@ export function EventWizard() {
         {currentStep === 5 && (
           <div className="space-y-6">
             <QrShareCard
-              eventName={formData.name || 'Sample Event'}
-              eventSlug={formData.slug || 'sample-event'}
+              eventName={formData.name || 'New Event'}
+              eventSlug={formData.slug || generateEventSlug(formData.name || 'event')}
             />
           </div>
         )}

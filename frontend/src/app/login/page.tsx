@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import { apiClient } from '@/lib/api';
+import { isAdminRole } from '@/types/user';
 
 function AuthForm() {
   const router = useRouter();
@@ -34,6 +35,24 @@ function AuthForm() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  // Only allow same-site relative redirects (blocks open-redirect phishing links)
+  const getSafeRedirect = (): string | null => {
+    const target = searchParams.get('redirect');
+    if (target && target.startsWith('/') && !target.startsWith('//') && !target.startsWith('/\\')) {
+      return target;
+    }
+    return null;
+  };
+
+  const storeSession = (data: any) => {
+    if (!data?.token || !data?.user) {
+      throw new Error('We could not sign you in. Please try again.');
+    }
+    localStorage.setItem('memora_token', data.token);
+    localStorage.setItem('memora_user', JSON.stringify(data.user));
+    return data.user;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -42,37 +61,15 @@ function AuthForm() {
 
     try {
       if (mode === 'login') {
-        let role = 'organizer';
-        try {
-          const res = await apiClient.post('/auth/login', { email, password });
-          if (res.data?.token) {
-            localStorage.setItem('memora_token', res.data.token);
-            if (res.data.user) {
-              localStorage.setItem('memora_user', JSON.stringify(res.data.user));
-              role = res.data.user.role || 'organizer';
-            }
-          }
-        } catch {
-          // Graceful fallback for offline dev/local testing
-          const isUserAdmin = email.toLowerCase().includes('admin');
-          role = isUserAdmin ? 'admin' : 'organizer';
-          localStorage.setItem('memora_token', 'session_token_' + Date.now());
-          localStorage.setItem('memora_user', JSON.stringify({ 
-            name: email.split('@')[0] || 'Studio Organizer', 
-            email, 
-            role,
-            plan: 'pro',
-            photosUsed: 0,
-            maxPhotos: 500
-          }));
-        }
+        const res = await apiClient.post('/auth/login', { email, password });
+        const user = storeSession(res.data);
 
-        setSuccessMessage('Authentication successful. Redirecting to workspace...');
+        setSuccessMessage('Signed in. Redirecting to your workspace...');
         setTimeout(() => {
-          const customRedirect = searchParams.get('redirect');
-          if (customRedirect) {
-            router.push(customRedirect);
-          } else if (role === 'admin') {
+          const safeRedirect = getSafeRedirect();
+          if (safeRedirect) {
+            router.push(safeRedirect);
+          } else if (isAdminRole(user.role)) {
             router.push('/admin');
           } else {
             router.push('/dashboard');
@@ -81,44 +78,26 @@ function AuthForm() {
       } else {
         // Register mode
         if (password !== passwordConfirmation) {
-          setError('Passwords do not match. Please verify your confirmation.');
+          setError('Passwords do not match. Please check and try again.');
           setIsLoading(false);
           return;
         }
 
-        try {
-          const res = await apiClient.post('/auth/register', {
-            name,
-            email,
-            password,
-            password_confirmation: passwordConfirmation,
-          });
-          if (res.data?.token) {
-            localStorage.setItem('memora_token', res.data.token);
-            if (res.data.user) {
-              localStorage.setItem('memora_user', JSON.stringify(res.data.user));
-            }
-          }
-        } catch {
-          localStorage.setItem('memora_token', 'session_token_' + Date.now());
-          localStorage.setItem('memora_user', JSON.stringify({ 
-            name: name || 'Event Organizer', 
-            email, 
-            role: 'organizer',
-            plan: 'free',
-            photosUsed: 0,
-            maxPhotos: 25
-          }));
-        }
+        const res = await apiClient.post('/auth/register', {
+          name,
+          email,
+          password,
+          password_confirmation: passwordConfirmation,
+        });
+        storeSession(res.data);
 
-        setSuccessMessage('Account created successfully! Preparing your studio...');
+        setSuccessMessage('Account created. Setting up your studio...');
         setTimeout(() => {
-          const customRedirect = searchParams.get('redirect');
-          router.push(customRedirect || '/dashboard');
+          router.push(getSafeRedirect() || '/dashboard');
         }, 500);
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'An error occurred during authentication.';
+      const msg = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
       setError(msg);
     } finally {
       setIsLoading(false);
@@ -368,63 +347,6 @@ function AuthForm() {
           <div className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground/80 mt-4 font-mono">
             <ShieldCheck className="w-3.5 h-3.5 text-primary" />
             <span>256-bit encryption • Private event vault</span>
-          </div>
-
-          {/* Quick-Fill Demo Credentials Card */}
-          <div className="mt-6 pt-5 border-t border-border/60 text-left bg-secondary/30 -mx-6 -mb-6 p-6 rounded-b-3xl">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground font-semibold flex items-center gap-1.5">
-                <Lock className="w-3 h-3 text-primary" />
-                <span>Demo Access Credentials</span>
-              </span>
-              <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                1-Click Autofill
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setMode('login');
-                  setEmail('admin@memora.studio');
-                  setPassword('admin123');
-                }}
-                className="p-2.5 rounded-xl border border-border/80 bg-background hover:border-primary/60 transition-all text-left group cursor-pointer shadow-2xs"
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-mono uppercase font-bold text-foreground group-hover:text-primary transition-colors">
-                    Admin
-                  </span>
-                  <span className="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded bg-foreground text-background">
-                    Master
-                  </span>
-                </div>
-                <div className="text-[11px] font-mono text-muted-foreground truncate">admin@memora.studio</div>
-                <div className="text-[10px] font-mono text-muted-foreground/80 mt-0.5">pass: admin123</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setMode('login');
-                  setEmail('organizer@memora.studio');
-                  setPassword('password123');
-                }}
-                className="p-2.5 rounded-xl border border-border/80 bg-background hover:border-primary/60 transition-all text-left group cursor-pointer shadow-2xs"
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-mono uppercase font-bold text-foreground group-hover:text-primary transition-colors">
-                    Organizer
-                  </span>
-                  <span className="text-[8px] font-mono uppercase px-1.5 py-0.5 rounded bg-secondary text-foreground border border-border/60">
-                    Host
-                  </span>
-                </div>
-                <div className="text-[11px] font-mono text-muted-foreground truncate">organizer@memora.studio</div>
-                <div className="text-[10px] font-mono text-muted-foreground/80 mt-0.5">pass: password123</div>
-              </button>
-            </div>
           </div>
         </div>
       </div>

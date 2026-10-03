@@ -166,19 +166,5 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
  * Reusable Minimalist Realtime Status Pill
  */
 export function RealtimeStatusBadge({ className = '' }: { className?: string }) {
-  const { isConnected } = useRealtimeContext();
-
-  return (
-    <div 
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider font-semibold transition-all ${
-        isConnected
-          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-          : 'bg-amber-500/10 text-amber-600 border border-amber-500/20'
-      } ${className}`}
-      title="Realtime sync active across all open devices, galleries, and tabs"
-    >
-      <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-      <span>{isConnected ? 'Live Sync' : 'Connecting'}</span>
-    </div>
-  );
+  return null;
 }

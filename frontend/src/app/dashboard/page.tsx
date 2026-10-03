@@ -24,9 +24,10 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { formatEventDate } from '@/lib/utils';
+import { formatEventDate, formatFirstName } from '@/lib/utils';
 import { QrShareCard } from '@/features/events/components/QrShareCard';
 import { isAdminRole } from '@/types/user';
+import { getScopedEvents, getCurrentUser } from '@/lib/userEvents';
 
 import { useRealtime, RealtimeStatusBadge } from '@/context/RealtimeContext';
 
@@ -44,13 +45,21 @@ export default function DashboardPage() {
   const loadDashboardData = React.useCallback(() => {
     try {
       const stored = localStorage.getItem('memora_user');
+      const studioSettings = localStorage.getItem('memora_studio_settings');
+      let customHostFirstName = '';
+      if (studioSettings) {
+        try {
+          const s = JSON.parse(studioSettings);
+          if (s.hostName) customHostFirstName = formatFirstName(s.hostName);
+        } catch {}
+      }
+
       if (stored) {
         const u = JSON.parse(stored);
-        if (u.name) setUserName(u.name.split(' ')[0]);
-        else if (u.email) setUserName(u.email.split('@')[0]);
-        else setUserName('Admin');
+        const resolvedName = customHostFirstName || formatFirstName(u);
+        setUserName(resolvedName);
 
-        const isAdmin = isAdminRole(u.role) || u.email?.toLowerCase().includes('admin') || u.role === 'admin';
+        const isAdmin = isAdminRole(u.role) || u.role === 'admin';
         if (isAdmin || u.subscription_plan === 'studio' || u.plan === 'studio') {
           setIsStudioPlan(true);
         }
@@ -70,25 +79,22 @@ export default function DashboardPage() {
         setIsStudioPlan(true);
       }
 
-      const storedEvents = localStorage.getItem('memora_events');
-      if (storedEvents) {
-        const parsed = JSON.parse(storedEvents);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setEvents(parsed.map((m: any, idx: number) => ({
-            id: m.id || `${idx + 1}`,
-            name: m.name || 'Custom Event',
-            slug: m.slug || 'custom-event',
-            eventType: m.eventType || 'wedding',
-            date: m.date || 'Upcoming',
-            status: m.status || 'active',
-            isPremium: m.isPremium || m.plan === 'pro' || m.plan === 'studio',
-            photoCount: m.photoCount || 0,
-            downloadCount: m.downloadCount || 0,
-            location: m.location || 'Private Venue',
-          })));
-        } else {
-          setEvents([]);
-        }
+      const userScoped = getScopedEvents(stored ? JSON.parse(stored) : null);
+      if (Array.isArray(userScoped) && userScoped.length > 0) {
+        setEvents(userScoped.map((m: any, idx: number) => ({
+          id: m.id || `${idx + 1}`,
+          name: m.name || 'Custom Event',
+          slug: m.slug || 'custom-event',
+          eventType: m.eventType || 'wedding',
+          date: m.date || 'Upcoming',
+          status: m.status || 'active',
+          isPremium: m.isPremium || m.plan === 'pro' || m.plan === 'studio',
+          photoCount: m.photoCount || 0,
+          downloadCount: m.downloadCount || 0,
+          location: m.location || 'Private Venue',
+        })));
+      } else {
+        setEvents([]);
       }
     } catch {}
 
@@ -100,6 +106,8 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadDashboardData();
+    window.addEventListener('storage', loadDashboardData);
+    return () => window.removeEventListener('storage', loadDashboardData);
   }, [loadDashboardData]);
 
   // Realtime subscription: auto-refresh metrics and event cards instantly
@@ -129,20 +137,6 @@ export default function DashboardPage() {
             <span className="font-mono text-[11px] uppercase tracking-[0.25em] text-primary font-medium">
               Overview
             </span>
-            <span className="text-muted-foreground/30">•</span>
-            <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Live
-            </span>
-            <RealtimeStatusBadge />
-            {isStudioPlan && (
-              <>
-                <span className="text-muted-foreground/30">•</span>
-                <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-[10px] font-mono uppercase font-semibold">
-                  Studio Active
-                </span>
-              </>
-            )}
           </div>
           <h1 className="font-display text-4xl sm:text-5xl font-light text-foreground tracking-tight">
             {greeting}, <span className="font-display italic font-normal text-primary">{userName || 'Admin'}</span>
@@ -152,8 +146,8 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          {events.length > 0 ? (
+        {events.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2.5">
             <Link href={`/e/${events[0].slug}`} target="_blank">
               <button className="px-5 py-2.5 rounded-full border border-border/80 hover:bg-secondary bg-card text-foreground text-xs font-mono uppercase tracking-[0.14em] transition-all flex items-center gap-2 cursor-pointer shadow-2xs">
                 <Camera className="w-3.5 h-3.5 text-primary" />
@@ -161,15 +155,8 @@ export default function DashboardPage() {
                 <ExternalLink className="w-3 h-3 opacity-60" />
               </button>
             </Link>
-          ) : null}
-
-          <Link href="/dashboard/events/create">
-            <button className="px-6 py-2.5 rounded-full bg-foreground hover:bg-foreground/90 text-background text-xs font-mono uppercase tracking-[0.14em] font-medium transition-all shadow-xs flex items-center gap-2 cursor-pointer active:scale-95">
-              <Plus className="w-4 h-4 stroke-[2.5]" />
-              <span>Create Event</span>
-            </button>
-          </Link>
-        </div>
+          </div>
+        )}
       </div>
 
       {/* 4 Metric Cards */}
@@ -294,14 +281,11 @@ export default function DashboardPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-wider font-semibold ${
-                      event.status === 'active'
-                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/25'
-                        : 'bg-secondary text-muted-foreground border border-border/60'
-                    }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${event.status === 'active' ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground'}`} />
-                      <span>{event.status}</span>
-                    </span>
+                    {event.status !== 'active' && (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-wider font-semibold bg-secondary text-muted-foreground border border-border/60">
+                        {event.status}
+                      </span>
+                    )}
 
                     {event.isPremium ? (
                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 font-semibold">

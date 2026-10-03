@@ -7,23 +7,36 @@
     "price": 0,
     "priceDisplay": "₱0",
     "period": "single event",
-    "summary": "Standard 3-photo strip for booth testing & private events",
+    "summary": "All 13 studio templates & 7 strip layouts included for booth testing & private events",
     "watermark": true,
     "maxPhotos": 50,
-    "templatesUnlocked": "2 Templates Included",
+    "templatesUnlocked": "All 13 Studio Templates Included",
     "filtersUnlocked": "3 Classic Filters",
     "downloads": "Downloads & digital gallery",
     "eventCoverage": "1 Single Event",
     "allowedTemplateIds": [
       "classic_filmstrip",
-      "vogue_met"
+      "vogue_met",
+      "ritz_gala",
+      "amalfi_wedding",
+      "marais_darkroom",
+      "versailles_baroque",
+      "soho_loft",
+      "rose_romance",
+      "monaco_grandprix",
+      "kyoto_wabi",
+      "hamptons_linen",
+      "ivy_collegiate",
+      "yearbook_alumni"
     ],
     "allowedLayoutIds": [
       "strip4",
       "strip3",
       "grid2x2",
+      "grid2x3",
       "filmstrip",
-      "grid2x3"
+      "polaroid",
+      "duo"
     ],
     "allowedEventTypes": [
       "other"
@@ -37,7 +50,12 @@
       },
       {
         "id": "f2",
-        "text": "1 standard 3-photo strip layout",
+        "text": "All 7 free strip layouts included",
+        "included": true
+      },
+      {
+        "id": "f_tpl",
+        "text": "All 13 studio templates included",
         "included": true
       },
       {
@@ -70,7 +88,7 @@
     "price": 1499,
     "priceDisplay": "₱1,499",
     "period": "per event · 1 month access",
-    "summary": "Full event pass with premium templates, zero watermark, and 1-month active access",
+    "summary": "Full event pass with exclusive PRO event templates, zero watermark, and 1-month active access",
     "watermark": false,
     "maxPhotos": -1,
     "templatesUnlocked": "All Templates & Layouts Unlocked",
@@ -90,7 +108,14 @@
       "kyoto_wabi",
       "hamptons_linen",
       "ivy_collegiate",
-      "yearbook_alumni"
+      "yearbook_alumni",
+      "event_party",
+      "event_wedding",
+      "event_birthday",
+      "event_school",
+      "event_beach",
+      "event_corporate",
+      "event_graduation"
     ],
     "allowedLayoutIds": [
       "strip4",
@@ -126,13 +151,13 @@
       },
       {
         "id": "p_events",
-        "text": "Full coverage for School, Beach, Party, Wedding, Birthday, Graduation & Corporate",
+        "text": "Exclusive PRO event templates: Party, Wedding, Birthday, School & more",
         "included": true,
         "highlight": true
       },
       {
         "id": "p2",
-        "text": "All 7 strip layouts & 10 designer presets",
+        "text": "All 7 strip layouts & 13 studio templates included",
         "included": true,
         "highlight": true
       },
@@ -188,7 +213,14 @@
       "kyoto_wabi",
       "hamptons_linen",
       "ivy_collegiate",
-      "yearbook_alumni"
+      "yearbook_alumni",
+      "event_party",
+      "event_wedding",
+      "event_birthday",
+      "event_school",
+      "event_beach",
+      "event_corporate",
+      "event_graduation"
     ],
     "allowedLayoutIds": [
       "strip4",
@@ -224,7 +256,7 @@
       },
       {
         "id": "s2",
-        "text": "All 10 templates & custom fonts/colors",
+        "text": "All PRO event templates & 13 studio templates",
         "included": true,
         "highlight": true
       },
