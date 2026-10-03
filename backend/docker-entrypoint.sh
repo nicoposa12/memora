@@ -27,6 +27,12 @@ if [ "$RUN_MIGRATIONS" = "true" ]; then
     php artisan migrate --force --no-interaction
 fi
 
+# Ensure production administrator account exists if credentials are provided in environment
+if [ -n "$SEED_ADMIN_EMAIL" ] && [ -n "$SEED_ADMIN_PASSWORD" ]; then
+    echo "Ensuring production administrator account exists..."
+    php artisan tinker --execute="App\Models\User::updateOrCreate(['email' => getenv('SEED_ADMIN_EMAIL') ?: env('SEED_ADMIN_EMAIL')], ['name' => 'System Administrator', 'password' => bcrypt(getenv('SEED_ADMIN_PASSWORD') ?: env('SEED_ADMIN_PASSWORD')), 'role' => 'admin', 'subscription_plan' => 'studio', 'subscription_status' => 'active']);" || true
+fi
+
 # Cache configuration & routes in production
 if [ "$APP_ENV" = "production" ]; then
     php artisan config:cache || true
