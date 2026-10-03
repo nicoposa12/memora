@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { toPng } from 'html-to-image';
 import { Logo } from '@/components/Logo';
 import { Timer, RotateCcw, Sparkles, Film, Palette, Layers, Camera, Check, Lock, ChevronDown } from 'lucide-react';
 import { broadcastRealtime, subscribeRealtime } from '@/lib/realtime';
@@ -153,8 +154,8 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-const PHOTO_WIDTH = 900;
-const PHOTO_HEIGHT = 1200;
+const PHOTO_WIDTH = 1200;
+const PHOTO_HEIGHT = 900;
 
 interface RenderStripOptions {
   shots: string[];
@@ -445,8 +446,8 @@ function drawCanvasBeachThemeAccents(
 
   photoRects.forEach((rect, idx) => {
     const pIdx = idx % 4;
-    const leftX = rect.x - 26;
-    const rightX = rect.x + rect.w + 26;
+    const leftX = rect.x - 6;
+    const rightX = rect.x + rect.w + 6;
     const topY = rect.y + 14;
     const midY = rect.y + rect.h / 2;
     const botY = rect.y + rect.h - 14;
@@ -2402,273 +2403,1021 @@ function drawCanvasBirthdayThemeAccents(
   ctx.restore();
 }
 
-async function renderPhotoStrip(opts: RenderStripOptions): Promise<string> {
-  const layout = LAYOUTS.find((l) => l.id === opts.layout || (l.id === 'polaroid' && opts.layout === 'single') || (l.id === 'grid2x2' && opts.layout === 'grid4')) ?? LAYOUTS[0];
-  const frame = FRAMES.find((f) => f.id === opts.frame) ?? FRAMES[0];
-  const images = await Promise.all(opts.shots.map(loadImage));
+function drawCanvasWaveFooter(ctx: CanvasRenderingContext2D, cx: number, cy: number, color: string) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3.5;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (let i = -70; i <= 70; i += 35) {
+    ctx.moveTo(cx + i - 15, cy);
+    ctx.quadraticCurveTo(cx + i - 7, cy - 10, cx + i, cy);
+    ctx.quadraticCurveTo(cx + i + 7, cy + 10, cx + i + 15, cy);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
 
-  const cols = layout.columns;
-  const rows = Math.ceil(images.length / cols);
-  const canvasWidth = 112 + cols * PHOTO_WIDTH + (cols - 1) * 32;
-  const canvasHeight = 112 + rows * PHOTO_HEIGHT + (rows - 1) * 32 + 200;
+function drawCanvasEqualizerFooter(ctx: CanvasRenderingContext2D, cx: number, cy: number, color: string) {
+  ctx.save();
+  ctx.fillStyle = color;
+  const heights = [10, 20, 32, 16, 36, 26, 18, 32, 22, 12];
+  const barWidth = 7;
+  const gap = 6;
+  const startX = cx - (heights.length * (barWidth + gap)) / 2;
+  heights.forEach((h, i) => {
+    ctx.fillRect(startX + i * (barWidth + gap), cy - h / 2, barWidth, h);
+  });
+  ctx.restore();
+}
 
-  const canvas = document.createElement('canvas');
-  canvas.width = canvasWidth;
-  canvas.height = canvasHeight;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('Canvas is not available in this browser');
+function drawCanvasWeddingFooter(ctx: CanvasRenderingContext2D, cx: number, cy: number, color: string) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(cx - 14, cy, 18, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx + 14, cy, 18, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
 
-  // Fill paper
-  ctx.fillStyle = opts.frameColor || frame.paper;
-  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+function drawCanvasBirthdayFooter(ctx: CanvasRenderingContext2D, cx: number, cy: number, color: string) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(cx - 70, cy - 10);
+  ctx.quadraticCurveTo(cx, cy + 6, cx + 70, cy - 10);
+  ctx.stroke();
+  for (let x = cx - 56; x <= cx + 56; x += 22) {
+    ctx.beginPath();
+    ctx.moveTo(x - 8, cy - 4);
+    ctx.lineTo(x + 8, cy - 4);
+    ctx.lineTo(x, cy + 14);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
 
-  const isSchoolThemeCanvas = 
-    opts.templateId === 'event_school' ||
-    (!opts.templateId && (
-      opts.frameColor === '#0a1424' || 
-      opts.frameColor === '#091424' || 
-      opts.frameColor === '#fdfaf3' ||
-      opts.title.toLowerCase().includes('school') ||
-      opts.title.toLowerCase().includes('academy') ||
-      opts.title.toLowerCase().includes('collegiate') ||
-      opts.title.toLowerCase().includes('yearbook')
-    ));
+function drawCanvasSkylineFooter(ctx: CanvasRenderingContext2D, cx: number, cy: number, color: string) {
+  ctx.save();
+  ctx.fillStyle = color;
+  const buildings = [
+    { w: 14, h: 22 },
+    { w: 18, h: 36 },
+    { w: 22, h: 46 },
+    { w: 16, h: 30 },
+    { w: 18, h: 26 },
+  ];
+  let startX = cx - 48;
+  buildings.forEach((b) => {
+    ctx.fillRect(startX, cy + 18 - b.h, b.w, b.h);
+    startX += b.w + 4;
+  });
+  ctx.restore();
+}
 
-  const isLightCanvas = isLightColor(opts.frameColor || frame.paper);
-  const schoolGold = isLightCanvas ? '#855d10' : '#d4af37';
-  const schoolInk = isLightCanvas ? '#0c1a30' : '#fcf8ef';
+function drawCanvasDiplomaFooter(ctx: CanvasRenderingContext2D, cx: number, cy: number, color: string) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 3;
+  ctx.strokeRect(cx - 30, cy - 8, 60, 16);
+  ctx.fillRect(cx - 6, cy - 12, 12, 24);
+  ctx.restore();
+}
 
-  // Academic Double Gold Diploma Borders
-  if (isSchoolThemeCanvas) {
-    ctx.strokeStyle = schoolGold;
-    ctx.lineWidth = 4;
-    ctx.strokeRect(20, 20, canvasWidth - 40, canvasHeight - 40);
-    ctx.strokeStyle = isLightCanvas ? 'rgba(133, 93, 16, 0.45)' : 'rgba(212, 175, 55, 0.5)';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(30, 30, canvasWidth - 60, canvasHeight - 60);
+function drawCanvasCrownFooter(ctx: CanvasRenderingContext2D, cx: number, cy: number, color: string) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(cx - 26, cy + 12);
+  ctx.lineTo(cx - 26, cy - 10);
+  ctx.lineTo(cx - 13, cy + 2);
+  ctx.lineTo(cx, cy - 16);
+  ctx.lineTo(cx + 13, cy + 2);
+  ctx.lineTo(cx + 26, cy - 10);
+  ctx.lineTo(cx + 26, cy + 12);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawCanvasMemoraInsignia(ctx: CanvasRenderingContext2D, cx: number, cy: number, color: string, isWatermark: boolean) {
+  ctx.save();
+  ctx.textAlign = 'center';
+  if (isWatermark) {
+    ctx.font = 'bold 22px "JetBrains Mono", monospace';
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.7;
+    ctx.fillText('MEMORA WATERMARK INCLUDED', cx, cy);
+  } else {
+    ctx.globalAlpha = 0.9;
+    const logoX = cx - 62;
+    const logoY = cy - 8;
+
+    // Orange Camera Logo with white lens
+    ctx.fillStyle = '#ea580c';
+    ctx.beginPath();
+    if (typeof (ctx as any).roundRect === 'function') {
+      (ctx as any).roundRect(logoX, logoY - 9, 26, 20, 6);
+    } else {
+      ctx.rect(logoX, logoY - 9, 26, 20);
+    }
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(logoX + 13, logoY + 1, 5.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = color;
+    ctx.font = 'bold 26px "Outfit", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('MEMORA', logoX + 36, cy + 6);
+  }
+  ctx.restore();
+}
+
+export interface LayoutGeometry {
+  cols: number;
+  rows: number;
+  sideMargin: number;
+  gap: number;
+  photoWidth: number;
+  photoHeight: number;
+  headerHeight: number;
+  footerHeight: number;
+  canvasWidth: number;
+  canvasHeight: number;
+  railWidth?: number;
+}
+
+export function getLayoutGeometry(layoutId: string, imageCount: number): LayoutGeometry {
+  if (layoutId === 'grid2x2') {
+    const cols = 2;
+    const rows = 2;
+    const sideMargin = 80;
+    const gap = 40;
+    const photoWidth = 900;
+    const photoHeight = 675; // 4:3
+    const headerHeight = 280;
+    const footerHeight = 280;
+    const canvasWidth = sideMargin * 2 + cols * photoWidth + gap; // 2000px
+    const canvasHeight = headerHeight + rows * photoHeight + gap + footerHeight; // 1950px
+    return { cols, rows, sideMargin, gap, photoWidth, photoHeight, headerHeight, footerHeight, canvasWidth, canvasHeight };
   }
 
-  // Draw photos
-  const photoRects: { x: number; y: number; w: number; h: number }[] = [];
-  images.forEach((img, index) => {
-    const col = index % cols;
-    const row = Math.floor(index / cols);
-    const x = 56 + col * (PHOTO_WIDTH + 32);
-    const y = 56 + row * (PHOTO_HEIGHT + 32);
-    photoRects.push({ x, y, w: PHOTO_WIDTH, h: PHOTO_HEIGHT });
+  if (layoutId === 'grid2x3') {
+    const cols = 2;
+    const rows = 3;
+    const sideMargin = 80;
+    const gap = 40;
+    const photoWidth = 900;
+    const photoHeight = 675; // 4:3
+    const headerHeight = 280;
+    const footerHeight = 280;
+    const canvasWidth = sideMargin * 2 + cols * photoWidth + gap; // 2000px
+    const canvasHeight = headerHeight + rows * photoHeight + (rows - 1) * gap + footerHeight; // 2625px
+    return { cols, rows, sideMargin, gap, photoWidth, photoHeight, headerHeight, footerHeight, canvasWidth, canvasHeight };
+  }
 
-    const scale = Math.max(PHOTO_WIDTH / img.width, PHOTO_HEIGHT / img.height);
-    const drawW = img.width * scale;
-    const drawH = img.height * scale;
+  if (layoutId === 'polaroid') {
+    const cols = 1;
+    const rows = 1;
+    const sideMargin = 80;
+    const gap = 0;
+    const photoWidth = 1200;
+    const photoHeight = 900; // 4:3
+    const headerHeight = 80;
+    const footerHeight = 520;
+    const canvasWidth = sideMargin * 2 + photoWidth; // 1360px
+    const canvasHeight = headerHeight + photoHeight + footerHeight; // 1500px
+    return { cols, rows, sideMargin, gap, photoWidth, photoHeight, headerHeight, footerHeight, canvasWidth, canvasHeight };
+  }
 
-    ctx.save();
+  if (layoutId === 'filmstrip') {
+    const cols = 1;
+    const rows = imageCount || 3;
+    const railWidth = 120;
+    const gap = 36;
+    const photoWidth = 1200;
+    const photoHeight = 900; // 4:3
+    const headerHeight = 300;
+    const footerHeight = 300;
+    const canvasWidth = railWidth * 2 + photoWidth; // 1440px
+    const canvasHeight = headerHeight + rows * photoHeight + (rows - 1) * gap + footerHeight;
+    return { cols, rows, sideMargin: railWidth, gap, photoWidth, photoHeight, headerHeight, footerHeight, canvasWidth, canvasHeight, railWidth };
+  }
+
+  // Vertical strips: strip3, strip4, duo
+  const cols = 1;
+  const rows = imageCount || (layoutId === 'duo' ? 2 : layoutId === 'strip3' ? 3 : 4);
+  const sideMargin = 80;
+  const gap = 34;
+  const photoWidth = 1200;
+  const photoHeight = 900; // 4:3
+  const headerHeight = 320;
+  const footerHeight = 300;
+  const canvasWidth = sideMargin * 2 + photoWidth; // 1360px
+  const canvasHeight = headerHeight + rows * photoHeight + (rows - 1) * gap + footerHeight;
+  return { cols, rows, sideMargin, gap, photoWidth, photoHeight, headerHeight, footerHeight, canvasWidth, canvasHeight };
+}
+
+function drawCanvasSprockets(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  railWidth: number,
+  isLight: boolean
+) {
+  ctx.save();
+  const holeW = 34;
+  const holeH = 48;
+  const holeRadius = 8;
+  const holeSpacing = 92;
+  const leftX = (railWidth - holeW) / 2;
+  const rightX = width - railWidth + (railWidth - holeW) / 2;
+  const totalHoles = Math.floor((height - 120) / holeSpacing);
+  const startY = (height - totalHoles * holeSpacing) / 2;
+
+  ctx.fillStyle = isLight ? '#1c1917' : '#ffffff';
+  ctx.strokeStyle = isLight ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.3)';
+  ctx.lineWidth = 1.5;
+
+  for (let h = 0; h < totalHoles; h++) {
+    const y = startY + h * holeSpacing;
+    // Left sprocket
     ctx.beginPath();
-    ctx.rect(x, y, PHOTO_WIDTH, PHOTO_HEIGHT);
-    ctx.clip();
-    ctx.filter = opts.filterCss || 'none';
-    ctx.drawImage(img, x + (PHOTO_WIDTH - drawW) / 2, y + (PHOTO_HEIGHT - drawH) / 2, drawW, drawH);
-    ctx.restore();
+    if (typeof (ctx as any).roundRect === 'function') {
+      (ctx as any).roundRect(leftX, y, holeW, holeH, holeRadius);
+    } else {
+      ctx.rect(leftX, y, holeW, holeH);
+    }
+    ctx.fill();
+    ctx.stroke();
 
-    if (isSchoolThemeCanvas) {
-      ctx.strokeStyle = isLightCanvas ? 'rgba(133, 93, 16, 0.7)' : 'rgba(212, 175, 55, 0.8)';
-      ctx.lineWidth = 4;
-      ctx.strokeRect(x, y, PHOTO_WIDTH, PHOTO_HEIGHT);
+    // Right sprocket
+    ctx.beginPath();
+    if (typeof (ctx as any).roundRect === 'function') {
+      (ctx as any).roundRect(rightX, y, holeW, holeH, holeRadius);
+    } else {
+      ctx.rect(rightX, y, holeW, holeH);
+    }
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // Vertical Film Inscription along inner rail
+  ctx.fillStyle = isLight ? '#64748b' : '#f59e0b';
+  ctx.font = 'bold 15px "JetBrains Mono", monospace';
+  ctx.save();
+  ctx.translate(railWidth - 12, height / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'center';
+  ctx.fillText('35MM ANALOG SAFETY FILM  •  ISO 400', 0, 0);
+  ctx.restore();
+
+  ctx.restore();
+}
+
+function drawCanvasBaroqueCorners(
+  ctx: CanvasRenderingContext2D,
+  rects: { x: number; y: number; w: number; h: number }[],
+  goldColor = '#d4af37'
+) {
+  ctx.save();
+  ctx.strokeStyle = goldColor;
+  ctx.lineWidth = 2.5;
+
+  rects.forEach(({ x, y, w, h }) => {
+    const s = 28;
+    // Top-left
+    ctx.beginPath();
+    ctx.moveTo(x - 8, y + s);
+    ctx.lineTo(x - 8, y - 8);
+    ctx.lineTo(x + s, y - 8);
+    ctx.stroke();
+    // Top-right
+    ctx.beginPath();
+    ctx.moveTo(x + w - s, y - 8);
+    ctx.lineTo(x + w + 8, y - 8);
+    ctx.lineTo(x + w + 8, y + s);
+    ctx.stroke();
+    // Bottom-left
+    ctx.beginPath();
+    ctx.moveTo(x - 8, y + h - s);
+    ctx.lineTo(x - 8, y + h + 8);
+    ctx.lineTo(x + s, y + h + 8);
+    ctx.stroke();
+    // Bottom-right
+    ctx.beginPath();
+    ctx.moveTo(x + w - s, y + h + 8);
+    ctx.lineTo(x + w + 8, y + h + 8);
+    ctx.lineTo(x + w + 8, y + h - s);
+    ctx.stroke();
+  });
+
+  ctx.restore();
+}
+
+function drawCanvasCorporateThemeAccents(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  photoRects: { x: number; y: number; w: number; h: number }[]
+) {
+  if (photoRects.length === 0) return;
+  ctx.save();
+
+  photoRects.forEach((rect, idx) => {
+    const leftX = rect.x - 26;
+    const rightX = rect.x + rect.w + 26;
+    const topY = rect.y + 20;
+    const midY = rect.y + rect.h / 2;
+    const botY = rect.y + rect.h - 20;
+
+    const drawBuilding = (cx: number, cy: number) => {
+      ctx.save();
+      ctx.fillStyle = '#2563eb';
+      ctx.fillRect(cx - 8, cy - 14, 16, 28);
+      ctx.fillStyle = '#ffffff';
+      for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 2; c++) {
+          ctx.fillRect(cx - 5 + c * 6, cy - 10 + r * 8, 3, 4);
+        }
+      }
+      ctx.restore();
+    };
+
+    const drawTrophy = (cx: number, cy: number) => {
+      ctx.save();
+      ctx.fillStyle = '#eab308';
+      ctx.strokeStyle = '#ca8a04';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cx - 8, cy - 10);
+      ctx.lineTo(cx + 8, cy - 10);
+      ctx.lineTo(cx + 6, cy + 2);
+      ctx.lineTo(cx - 6, cy + 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillRect(cx - 3, cy + 2, 6, 6);
+      ctx.fillRect(cx - 7, cy + 8, 14, 4);
+      ctx.restore();
+    };
+
+    const drawSparkle = (cx: number, cy: number, color = '#38bdf8') => {
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    };
+
+    if (idx % 2 === 0) {
+      drawBuilding(leftX, topY);
+      drawSparkle(leftX, midY);
+      drawTrophy(rightX, topY);
+      drawSparkle(rightX, botY);
+    } else {
+      drawTrophy(leftX, botY);
+      drawSparkle(leftX, topY);
+      drawBuilding(rightX, botY);
+      drawSparkle(rightX, midY);
     }
   });
 
-  // Draw school stickers & badges onto canvas
-  if (isSchoolThemeCanvas && cols === 1) {
-    drawCanvasSchoolThemeAccents(ctx, canvasWidth, canvasHeight, isLightCanvas, photoRects);
+  ctx.restore();
+}
+
+function drawCanvasGraduationThemeAccents(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  photoRects: { x: number; y: number; w: number; h: number }[]
+) {
+  if (photoRects.length === 0) return;
+  ctx.save();
+
+  photoRects.forEach((rect, idx) => {
+    const leftX = rect.x - 26;
+    const rightX = rect.x + rect.w + 26;
+    const topY = rect.y + 20;
+    const midY = rect.y + rect.h / 2;
+    const botY = rect.y + rect.h - 20;
+
+    const drawCap = (cx: number, cy: number) => {
+      ctx.save();
+      ctx.fillStyle = '#d4af37';
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 8);
+      ctx.lineTo(cx + 12, cy - 2);
+      ctx.lineTo(cx, cy + 4);
+      ctx.lineTo(cx - 12, cy - 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillRect(cx - 5, cy + 4, 10, 4);
+      ctx.restore();
+    };
+
+    const drawStar = (cx: number, cy: number) => {
+      ctx.save();
+      ctx.fillStyle = '#fde047';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    };
+
+    if (idx % 2 === 0) {
+      drawCap(leftX, topY);
+      drawStar(leftX, botY);
+      drawStar(rightX, topY);
+      drawCap(rightX, botY);
+    } else {
+      drawStar(leftX, midY);
+      drawCap(rightX, midY);
+    }
+  });
+
+  ctx.restore();
+}
+
+function drawCanvasDebutThemeAccents(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  photoRects: { x: number; y: number; w: number; h: number }[]
+) {
+  if (photoRects.length === 0) return;
+  ctx.save();
+
+  photoRects.forEach((rect, idx) => {
+    const leftX = rect.x - 26;
+    const rightX = rect.x + rect.w + 26;
+    const topY = rect.y + 20;
+    const midY = rect.y + rect.h / 2;
+    const botY = rect.y + rect.h - 20;
+
+    const drawCrown = (cx: number, cy: number) => {
+      ctx.save();
+      ctx.strokeStyle = '#db2777';
+      ctx.fillStyle = '#f472b6';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cx - 8, cy + 6);
+      ctx.lineTo(cx - 8, cy - 4);
+      ctx.lineTo(cx - 4, cy + 1);
+      ctx.lineTo(cx, cy - 7);
+      ctx.lineTo(cx + 4, cy + 1);
+      ctx.lineTo(cx + 8, cy - 4);
+      ctx.lineTo(cx + 8, cy + 6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    };
+
+    const drawRoseSparkle = (cx: number, cy: number) => {
+      ctx.save();
+      ctx.fillStyle = '#f43f5e';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    };
+
+    if (idx % 2 === 0) {
+      drawCrown(leftX, topY);
+      drawRoseSparkle(leftX, botY);
+      drawRoseSparkle(rightX, topY);
+      drawCrown(rightX, botY);
+    } else {
+      drawRoseSparkle(leftX, midY);
+      drawCrown(rightX, midY);
+    }
+  });
+
+  ctx.restore();
+}
+
+/**
+ * Universal photo strip content renderer ensuring canvas output perfectly matches the live template preview
+ */
+function drawPhotoStripContent(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  images: HTMLImageElement[],
+  opts: RenderStripOptions,
+  activeSpotlightIdx: number | null = null,
+  geomOverride?: LayoutGeometry
+) {
+  const layout = LAYOUTS.find((l) => l.id === opts.layout || (l.id === 'polaroid' && opts.layout === 'single') || (l.id === 'grid2x2' && opts.layout === 'grid4')) ?? LAYOUTS[0];
+  const geom = geomOverride || getLayoutGeometry(layout.id, images.length);
+  const { cols, rows, sideMargin, gap, photoWidth, photoHeight, headerHeight, footerHeight } = geom;
+
+  // Resolve target template object from all system & pro event templates
+  const template =
+    [...ALL_PRO_EVENT_TEMPLATES, ...ALL_SYSTEM_TEMPLATES].find((t) => t.id === opts.templateId) ||
+    ALL_SYSTEM_TEMPLATES[0];
+
+  const isSchool =
+    template.id === 'event_school' ||
+    template.id === 'ivy_collegiate' ||
+    template.id === 'yearbook_alumni' ||
+    template.category === 'school_event' ||
+    template.category === 'school' ||
+    opts.frameColor === '#0a1424' ||
+    opts.frameColor === '#fdfaf3' ||
+    opts.title.toLowerCase().includes('school') ||
+    opts.title.toLowerCase().includes('academy');
+
+  const isBeach =
+    template.id === 'event_beach' ||
+    template.category === 'beach_event' ||
+    opts.frameColor === '#f0f9ff' ||
+    opts.title.toLowerCase().includes('beach') ||
+    opts.title.toLowerCase().includes('surf');
+
+  const isParty =
+    template.id === 'event_party' ||
+    template.category === 'party_event' ||
+    opts.frameColor === '#0f1117' ||
+    opts.title.toLowerCase().includes('party') ||
+    opts.title.toLowerCase().includes('celebration');
+
+  const isWedding =
+    template.id === 'event_wedding' ||
+    template.id === 'amalfi_wedding' ||
+    template.category === 'wedding_event' ||
+    opts.frameColor === '#fcf8f4' ||
+    opts.title.toLowerCase().includes('wedding') ||
+    opts.title.toLowerCase().includes('forever');
+
+  const isBirthday =
+    template.id === 'event_birthday' ||
+    template.category === 'birthday_event' ||
+    opts.frameColor === '#fffdf9' ||
+    opts.title.toLowerCase().includes('birthday') ||
+    opts.title.toLowerCase().includes('celebrate');
+
+  const isCorporate =
+    template.id === 'event_corporate' ||
+    template.category === 'corporate_event' ||
+    opts.frameColor === '#f8fafc' ||
+    opts.title.toLowerCase().includes('corporate') ||
+    opts.title.toLowerCase().includes('summit');
+
+  const isGraduation =
+    template.id === 'event_graduation' ||
+    template.category === 'graduation_event' ||
+    opts.frameColor === '#0a1128' ||
+    opts.title.toLowerCase().includes('graduation') ||
+    opts.title.toLowerCase().includes('commencement');
+
+  const isDebut =
+    template.id === 'event_debut' ||
+    template.category === 'debut_event' ||
+    opts.frameColor === '#fff5f7' ||
+    opts.title.toLowerCase().includes('debut') ||
+    opts.title.toLowerCase().includes('eighteen');
+
+  const isVersailles = template.id === 'versailles_baroque';
+  const isRitz = template.id === 'ritz_gala';
+  const isVogue = template.id === 'vogue_met';
+  const isKyoto = template.id === 'kyoto_wabi';
+
+  const isLightCanvas = isLightColor(opts.frameColor || template.frameColor || '#ffffff');
+  const schoolGold = isLightCanvas ? '#855d10' : '#d4af37';
+  const schoolInk = isLightCanvas ? '#0c1a30' : '#fcf8ef';
+
+  // 1. Background Fill
+  const bgColor = isSchool
+    ? (isLightCanvas ? '#fdfaf3' : '#0a1424')
+    : isBeach
+    ? '#f0f9ff'
+    : isParty
+    ? '#0f1117'
+    : isWedding
+    ? '#fcf8f4'
+    : isBirthday
+    ? '#fffdf9'
+    : isCorporate
+    ? '#f8fafc'
+    : isGraduation
+    ? '#0a1128'
+    : isDebut
+    ? '#fff5f7'
+    : (opts.frameColor || template.frameColor || '#ffffff');
+
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 0, width, height);
+
+  // 2. Accent & Outer Border Colors
+  const accentColor = isSchool
+    ? schoolGold
+    : isBeach
+    ? '#0284c7'
+    : isParty
+    ? '#ec4899'
+    : isWedding
+    ? '#b8860b'
+    : isBirthday
+    ? '#d97706'
+    : isCorporate
+    ? '#2563eb'
+    : isGraduation
+    ? '#d4af37'
+    : isDebut
+    ? '#db2777'
+    : (opts.textColor || template.textColor || '#1e293b');
+
+  const titleColor = isSchool
+    ? schoolInk
+    : isBeach
+    ? '#0f172a'
+    : isParty
+    ? '#f4f4f5'
+    : isWedding
+    ? '#1f1b18'
+    : isBirthday
+    ? '#18181b'
+    : isCorporate
+    ? '#0f172a'
+    : isGraduation
+    ? '#fcf8ef'
+    : isDebut
+    ? '#831843'
+    : (opts.textColor || template.textColor || '#0f172a');
+
+  const outerBorderColor = isSchool
+    ? schoolGold
+    : isBeach
+    ? 'rgba(2, 132, 199, 0.45)'
+    : isParty
+    ? 'rgba(236, 72, 153, 0.65)'
+    : isWedding
+    ? 'rgba(184, 134, 11, 0.45)'
+    : isBirthday
+    ? 'rgba(245, 158, 11, 0.5)'
+    : isCorporate
+    ? 'rgba(37, 99, 235, 0.45)'
+    : isGraduation
+    ? 'rgba(212, 175, 55, 0.65)'
+    : isDebut
+    ? 'rgba(219, 39, 119, 0.45)'
+    : isRitz
+    ? '#d4af37'
+    : (isLightCanvas ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.18)');
+
+  const dividerColor = isSchool
+    ? (isLightCanvas ? 'rgba(133, 93, 16, 0.45)' : 'rgba(212, 175, 55, 0.5)')
+    : isBeach
+    ? 'rgba(2, 132, 199, 0.35)'
+    : isParty
+    ? 'rgba(236, 72, 153, 0.45)'
+    : isWedding
+    ? 'rgba(184, 134, 11, 0.35)'
+    : isBirthday
+    ? 'rgba(245, 158, 11, 0.4)'
+    : isCorporate
+    ? 'rgba(37, 99, 235, 0.35)'
+    : isGraduation
+    ? 'rgba(212, 175, 55, 0.4)'
+    : isDebut
+    ? 'rgba(219, 39, 119, 0.35)'
+    : (isLightCanvas ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.15)');
+
+  const drawRoundRectPath = (x: number, y: number, w: number, h: number, r: number) => {
+    ctx.beginPath();
+    if (typeof (ctx as any).roundRect === 'function') {
+      (ctx as any).roundRect(x, y, w, h, r);
+    } else {
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+  };
+
+  // 3. Draw Outer Card Borders
+  if (isSchool) {
+    ctx.strokeStyle = schoolGold;
+    ctx.lineWidth = 5;
+    drawRoundRectPath(18, 18, width - 36, height - 36, 28);
+    ctx.stroke();
+    ctx.strokeStyle = isLightCanvas ? 'rgba(133, 93, 16, 0.45)' : 'rgba(212, 175, 55, 0.5)';
+    ctx.lineWidth = 2;
+    drawRoundRectPath(28, 28, width - 56, height - 56, 20);
+    ctx.stroke();
+  } else if (isRitz) {
+    ctx.strokeStyle = '#d4af37';
+    ctx.lineWidth = 4;
+    drawRoundRectPath(16, 16, width - 32, height - 32, 28);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(212, 175, 55, 0.5)';
+    ctx.lineWidth = 1.5;
+    drawRoundRectPath(26, 26, width - 52, height - 52, 20);
+    ctx.stroke();
+  } else {
+    ctx.strokeStyle = outerBorderColor;
+    ctx.lineWidth = 6;
+    drawRoundRectPath(16, 16, width - 32, height - 32, 28);
+    ctx.stroke();
   }
 
-  const isBeachThemeCanvas =
-    opts.templateId === 'event_beach' ||
-    (!opts.templateId && (
-      opts.frameColor === '#fefcf6' ||
-      opts.title.toLowerCase().includes('beach') ||
-      opts.title.toLowerCase().includes('surf') ||
-      opts.title.toLowerCase().includes('bonfire') ||
-      opts.caption.toLowerCase().includes('beach') ||
-      opts.caption.toLowerCase().includes('surf')
-    ));
-
-  if (isBeachThemeCanvas && cols === 1) {
-    drawCanvasBeachThemeAccents(ctx, canvasWidth, canvasHeight, photoRects);
+  // 4. Sprockets Perforations for 35mm Filmstrip
+  if (layout.id === 'filmstrip' || geom.railWidth) {
+    drawCanvasSprockets(ctx, width, height, geom.railWidth || 120, isLightCanvas);
   }
 
-  const isPartyThemeCanvas =
-    opts.templateId === 'event_party' ||
-    (!opts.templateId && (
-      opts.frameColor === '#0f1117' ||
-      opts.title.toLowerCase().includes('party') ||
-      opts.title.toLowerCase().includes('nightclub') ||
-      opts.title.toLowerCase().includes('dance') ||
-      opts.caption.toLowerCase().includes('party') ||
-      opts.caption.toLowerCase().includes('midnight')
-    ));
+  // 5. Top Header Inscription (Customized per Event Theme and Free Template)
+  const dividerMargin = layout.id === 'filmstrip' ? (geom.railWidth || 120) : sideMargin;
 
-  if (isPartyThemeCanvas && cols === 1) {
-    drawCanvasPartyThemeAccents(ctx, canvasWidth, canvasHeight, photoRects);
+  if (layout.id !== 'polaroid') {
+    ctx.save();
+    ctx.textAlign = 'center';
+
+    const tagText = isSchool
+      ? '★ GOOD DAYS • GREAT MEMORIES ★'
+      : isBeach
+      ? '🌴 LET THE GOOD TIMES ROLL 🌴'
+      : isParty
+      ? '✦ PARTY NIGHT ✦'
+      : isWedding
+      ? '✦ WEDDING CELEBRATION ✦'
+      : isBirthday
+      ? '✦ YOUR DAY • YOUR MOMENT ✦'
+      : isCorporate
+      ? '✦ CORPORATE MOMENTS ✦'
+      : isGraduation
+      ? '✦ GRADUATION CELEBRATION ✦'
+      : isDebut
+      ? '✦ DEBUTANTE CELEBRATION ✦'
+      : template.badge
+      ? `✦ ${template.badge.toUpperCase()} ✦`
+      : '✦ MEMORA PHOTO STUDIO ✦';
+
+    ctx.fillStyle = accentColor;
+    ctx.font = 'bold 26px "JetBrains Mono", monospace';
+    ctx.fillText(tagText, width / 2, Math.max(54, headerHeight * 0.28));
+
+    const mainTitle = isSchool
+      ? 'OUR SCHOOL ERA'
+      : isBeach
+      ? 'GOOD VIBES, GREAT TIMES'
+      : isParty
+      ? 'GOOD FRIENDS. GREAT NIGHT'
+      : isWedding
+      ? 'FOREVER BEGINS'
+      : isBirthday
+      ? 'CELEBRATE EVERY MOMENT'
+      : isCorporate
+      ? 'BUILT TOGETHER. ACHIEVED TOGETHER'
+      : isGraduation
+      ? 'THE NEXT CHAPTER'
+      : isDebut
+      ? 'THE GRAND EIGHTEEN'
+      : (template.name || opts.title || 'MEMORA PHOTOBOOTH').toUpperCase().slice(0, 32);
+
+    ctx.fillStyle = titleColor;
+    ctx.font = 'bold 56px "Cormorant Garamond", Georgia, serif';
+    ctx.fillText(mainTitle, width / 2, Math.max(122, headerHeight * 0.58));
+
+    const subText = isSchool
+      ? 'SCHOOL YEAR 2026–2027'
+      : isBeach
+      ? 'Sun • Sand • Sea • Memories'
+      : isParty
+      ? 'Dance • Laugh • Celebrate • Repeat'
+      : isWedding
+      ? 'Two hearts • One beautiful journey'
+      : isBirthday
+      ? 'Good Times • Big Smiles • Great Memories'
+      : isCorporate
+      ? 'Connect • Collaborate • Celebrate'
+      : isGraduation
+      ? 'One journey ends. Another begins'
+      : isDebut
+      ? 'A Night of Elegance & Memories'
+      : (opts.caption.trim() ? opts.caption.slice(0, 44) : (template.description ? template.description.slice(0, 44) : 'Live Photobooth Moments'));
+
+    ctx.fillStyle = accentColor;
+    if (isWedding) {
+      ctx.font = 'italic 28px "Cormorant Garamond", Georgia, serif';
+    } else {
+      ctx.font = 'bold 24px "JetBrains Mono", monospace';
+    }
+    ctx.fillText(subText, width / 2, Math.max(178, headerHeight * 0.8));
+
+    ctx.strokeStyle = dividerColor;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(dividerMargin, headerHeight - 16);
+    ctx.lineTo(width - dividerMargin, headerHeight - 16);
+    ctx.stroke();
+
+    ctx.restore();
   }
 
-  const isWeddingThemeCanvas =
-    opts.templateId === 'event_wedding' ||
-    (!opts.templateId && (
-      opts.frameColor === '#fcf8f4' ||
-      opts.frameColor === '#fbf8f1' ||
-      opts.title.toLowerCase().includes('wedding') ||
-      opts.title.toLowerCase().includes('matrimony') ||
-      opts.title.toLowerCase().includes('nuptial') ||
-      opts.title.toLowerCase().includes('vow') ||
-      opts.caption.toLowerCase().includes('wedding') ||
-      opts.caption.toLowerCase().includes('reception')
-    ));
+  // 6. Photos Rendering
+  const photoStartY = headerHeight;
+  const photoRects: { x: number; y: number; w: number; h: number }[] = [];
 
-  if (isWeddingThemeCanvas && cols === 1) {
-    drawCanvasWeddingThemeAccents(ctx, canvasWidth, canvasHeight, photoRects);
+  images.forEach((img, index) => {
+    const col = index % cols;
+    const row = Math.floor(index / cols);
+    const x = sideMargin + col * (photoWidth + gap);
+    const y = photoStartY + row * (photoHeight + gap);
+    photoRects.push({ x, y, w: photoWidth, h: photoHeight });
+
+    const s = Math.max(photoWidth / img.width, photoHeight / img.height);
+    const drawW = img.width * s;
+    const drawH = img.height * s;
+
+    ctx.save();
+    ctx.beginPath();
+    if (typeof (ctx as any).roundRect === 'function') {
+      (ctx as any).roundRect(x, y, photoWidth, photoHeight, 8);
+    } else {
+      ctx.rect(x, y, photoWidth, photoHeight);
+    }
+    ctx.clip();
+    ctx.filter = opts.filterCss || 'none';
+
+    if (activeSpotlightIdx !== null && activeSpotlightIdx !== index) {
+      ctx.globalAlpha = 0.72;
+    } else {
+      ctx.globalAlpha = 1.0;
+    }
+
+    ctx.drawImage(img, x + (photoWidth - drawW) / 2, y + (photoHeight - drawH) / 2, drawW, drawH);
+    ctx.restore();
+
+    // Frame outline
+    ctx.save();
+    ctx.beginPath();
+    if (typeof (ctx as any).roundRect === 'function') {
+      (ctx as any).roundRect(x, y, photoWidth, photoHeight, 8);
+    } else {
+      ctx.rect(x, y, photoWidth, photoHeight);
+    }
+    if (activeSpotlightIdx === index) {
+      ctx.strokeStyle = isLightCanvas ? '#d8b86a' : '#2b211c';
+      ctx.lineWidth = 10;
+    } else {
+      ctx.strokeStyle = dividerColor;
+      ctx.lineWidth = 3.5;
+    }
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  // 7. Special Template Accents
+  if (isVersailles || isRitz) {
+    drawCanvasBaroqueCorners(ctx, photoRects, isRitz ? '#e5c05b' : '#d4af37');
   }
 
-  const isBirthdayThemeCanvas =
-    opts.templateId === 'event_birthday' ||
-    (!opts.templateId && (
-      opts.frameColor === '#fffdf9' ||
-      (opts.frameColor === '#ffffff' && (opts.title.toLowerCase().includes('birthday') || opts.caption.toLowerCase().includes('birthday'))) ||
-      opts.title.toLowerCase().includes('birthday') ||
-      opts.title.toLowerCase().includes('bash') ||
-      opts.title.toLowerCase().includes('celebrate') ||
-      opts.caption.toLowerCase().includes('birthday') ||
-      opts.caption.toLowerCase().includes('celebration')
-    ));
+  // 8. Filmstrip Frame Index Numbers (▶ 01A, ▶ 02A...)
+  if (layout.id === 'filmstrip') {
+    ctx.save();
+    ctx.fillStyle = isLightCanvas ? '#64748b' : '#f59e0b';
+    ctx.font = 'bold 20px "JetBrains Mono", monospace';
+    ctx.textAlign = 'right';
+    photoRects.forEach((rect, idx) => {
+      ctx.fillText(`▶ 0${idx + 1}A`, rect.x + rect.w, rect.y + rect.h + 26);
+    });
+    ctx.restore();
+  }
 
-  const isCorporateThemeCanvas =
-    opts.templateId === 'event_corporate' ||
-    (!opts.templateId && (
-      opts.frameColor === '#f8fafc' ||
-      opts.title.toLowerCase().includes('corporate') ||
-      opts.title.toLowerCase().includes('summit') ||
-      opts.title.toLowerCase().includes('gala') ||
-      opts.caption.toLowerCase().includes('corporate') ||
-      opts.caption.toLowerCase().includes('innovation')
-    ));
-
-  const isGraduationThemeCanvas =
-    opts.templateId === 'event_graduation' ||
-    (!opts.templateId && (
-      opts.frameColor === '#0a1128' ||
-      opts.title.toLowerCase().includes('graduation') ||
-      opts.title.toLowerCase().includes('commencement') ||
-      opts.caption.toLowerCase().includes('honors') ||
-      opts.caption.toLowerCase().includes('graduate')
-    ));
-
-  if (isBirthdayThemeCanvas && cols === 1) {
-    drawCanvasBirthdayThemeAccents(ctx, canvasWidth, canvasHeight, photoRects);
+  // 9. Side Embellishments (when vertical strip)
+  if (cols === 1) {
+    if (isSchool) drawCanvasSchoolThemeAccents(ctx, width, height, isLightCanvas, photoRects);
+    else if (isBeach) drawCanvasBeachThemeAccents(ctx, width, height, photoRects);
+    else if (isParty) drawCanvasPartyThemeAccents(ctx, width, height, photoRects);
+    else if (isWedding) drawCanvasWeddingThemeAccents(ctx, width, height, photoRects);
+    else if (isBirthday) drawCanvasBirthdayThemeAccents(ctx, width, height, photoRects);
+    else if (isCorporate) drawCanvasCorporateThemeAccents(ctx, width, height, photoRects);
+    else if (isGraduation) drawCanvasGraduationThemeAccents(ctx, width, height, photoRects);
+    else if (isDebut) drawCanvasDebutThemeAccents(ctx, width, height, photoRects);
   }
 
   ctx.filter = 'none';
+  ctx.globalAlpha = 1;
 
-  // Bottom footer area
-  const footerTop = canvasHeight - 200 + 24;
-  ctx.fillStyle = isSchoolThemeCanvas
-    ? schoolInk
-    : isBeachThemeCanvas
-    ? '#0f172a'
-    : isPartyThemeCanvas
-    ? '#f4f4f5'
-    : isWeddingThemeCanvas
-    ? '#1f1b18'
-    : isBirthdayThemeCanvas
-    ? '#18181b'
-    : isCorporateThemeCanvas
-    ? '#0f172a'
-    : isGraduationThemeCanvas
-    ? '#fcf8ef'
-    : (opts.textColor || frame.ink);
-  ctx.textAlign = 'center';
-  ctx.font = 'bold 72px "Cormorant Garamond", Georgia, serif';
-  ctx.fillText(
-    isSchoolThemeCanvas
-      ? 'CAMPUS DAYS • SCHOOL YEAR 2026–2027'
-      : isBeachThemeCanvas
-      ? 'GOOD VIBES, GREAT TIMES'
-      : isPartyThemeCanvas
-      ? 'GOOD FRIENDS. GREAT NIGHT'
-      : isWeddingThemeCanvas
-      ? 'FOREVER BEGINS'
-      : isBirthdayThemeCanvas
-      ? 'CELEBRATE EVERY LITTLE MOMENT'
-      : isCorporateThemeCanvas
-      ? 'BUILT TOGETHER. ACHIEVED TOGETHER'
-      : isGraduationThemeCanvas
-      ? 'THE NEXT CHAPTER'
-      : opts.title.toUpperCase().slice(0, 28),
-    canvasWidth / 2,
-    footerTop + 58
-  );
+  // 10. Bottom Footer Area
+  if (layout.id === 'polaroid') {
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = titleColor;
+    ctx.font = 'italic 56px "Cormorant Garamond", Georgia, serif';
+    ctx.fillText(opts.title || template.name, width / 2, photoStartY + photoHeight + 130);
 
-  ctx.fillStyle = isSchoolThemeCanvas
-    ? schoolGold
-    : isBeachThemeCanvas
-    ? '#0284c7'
-    : isPartyThemeCanvas
-    ? '#ec4899'
-    : isWeddingThemeCanvas
-    ? '#b8860b'
-    : isBirthdayThemeCanvas
-    ? '#d97706'
-    : isCorporateThemeCanvas
-    ? '#2563eb'
-    : isGraduationThemeCanvas
-    ? '#d4af37'
-    : (opts.textColor || frame.ink);
-  if (isSchoolThemeCanvas) {
-    ctx.font = 'bold 28px "JetBrains Mono", monospace';
-    ctx.fillText('MEMORIES WITH CLASSMATES • EVERYDAY MOMENTS', canvasWidth / 2, footerTop + 116);
-  } else if (isBeachThemeCanvas) {
-    ctx.font = 'bold 28px "JetBrains Mono", monospace';
-    ctx.fillText('SUN • SAND • SEA • MEMORIES', canvasWidth / 2, footerTop + 116);
-  } else if (isPartyThemeCanvas) {
-    ctx.font = 'bold 28px "JetBrains Mono", monospace';
-    ctx.fillText('DANCE • LAUGH • CELEBRATE • REPEAT', canvasWidth / 2, footerTop + 116);
-  } else if (isWeddingThemeCanvas) {
-    ctx.font = 'bold 28px "JetBrains Mono", monospace';
-    ctx.fillText('TWO HEARTS • ONE BEAUTIFUL JOURNEY', canvasWidth / 2, footerTop + 116);
-  } else if (isBirthdayThemeCanvas) {
-    ctx.font = 'bold 28px "JetBrains Mono", monospace';
-    ctx.fillText('GOOD TIMES • BIG SMILES • GREAT MEMORIES', canvasWidth / 2, footerTop + 116);
-  } else if (isCorporateThemeCanvas) {
-    ctx.font = 'bold 28px "JetBrains Mono", monospace';
-    ctx.fillText('CONNECT • COLLABORATE • CELEBRATE', canvasWidth / 2, footerTop + 116);
-  } else if (isGraduationThemeCanvas) {
-    ctx.font = 'bold 28px "JetBrains Mono", monospace';
-    ctx.fillText('ONE JOURNEY ENDS. ANOTHER BEGINS', canvasWidth / 2, footerTop + 116);
-  } else if (opts.caption.trim()) {
-    ctx.font = 'italic 44px "Cormorant Garamond", Georgia, serif';
-    ctx.globalAlpha = 0.85;
-    ctx.fillText(opts.caption.slice(0, 44), canvasWidth / 2, footerTop + 126);
-    ctx.globalAlpha = 1;
+    ctx.fillStyle = accentColor;
+    ctx.font = 'bold 24px "JetBrains Mono", monospace';
+    const polDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    ctx.fillText(opts.caption.trim() || polDate, width / 2, photoStartY + photoHeight + 200);
+
+    drawCanvasMemoraInsignia(ctx, width / 2, photoStartY + photoHeight + 350, accentColor, opts.watermark !== false);
+    ctx.restore();
+  } else {
+    const footerTop = photoStartY + rows * photoHeight + (rows - 1) * gap + 24;
+    const footerCenterY = footerTop + 65;
+
+    ctx.save();
+    ctx.strokeStyle = dividerColor;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(dividerMargin, footerTop);
+    ctx.lineTo(width - dividerMargin, footerTop);
+    ctx.stroke();
+
+    if (isBeach) {
+      drawCanvasWaveFooter(ctx, width / 2, footerCenterY, '#0284c7');
+    } else if (isParty) {
+      drawCanvasEqualizerFooter(ctx, width / 2, footerCenterY, '#ec4899');
+    } else if (isWedding) {
+      drawCanvasWeddingFooter(ctx, width / 2, footerCenterY, '#b8860b');
+    } else if (isBirthday) {
+      drawCanvasBirthdayFooter(ctx, width / 2, footerCenterY, '#d97706');
+    } else if (isCorporate) {
+      drawCanvasSkylineFooter(ctx, width / 2, footerCenterY, '#2563eb');
+    } else if (isSchool || isGraduation) {
+      drawCanvasDiplomaFooter(ctx, width / 2, footerCenterY, isSchool ? schoolGold : '#d4af37');
+    } else if (isDebut) {
+      drawCanvasCrownFooter(ctx, width / 2, footerCenterY, '#db2777');
+    } else if (isKyoto) {
+      // Scarlet red seal stamp
+      ctx.save();
+      ctx.fillStyle = '#dc2626';
+      ctx.fillRect(width / 2 - 20, footerCenterY - 20, 40, 40);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 22px serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('印', width / 2, footerCenterY);
+      ctx.restore();
+    } else if (isVogue) {
+      ctx.save();
+      ctx.fillStyle = titleColor;
+      ctx.font = 'bold 24px "Cormorant Garamond", serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('✦ VOGUE EDITORIAL ✦', width / 2, footerCenterY);
+      ctx.restore();
+    } else if (isRitz) {
+      ctx.save();
+      ctx.fillStyle = '#d4af37';
+      ctx.font = '26px serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('⚜ RITZ SIGNATURE ⚜', width / 2, footerCenterY);
+      ctx.restore();
+    }
+
+    drawCanvasMemoraInsignia(ctx, width / 2, footerCenterY + 70, accentColor, opts.watermark !== false);
+    ctx.restore();
   }
+}
 
-  if (opts.watermark !== false) {
-    ctx.font = '500 24px "JetBrains Mono", monospace';
-    ctx.globalAlpha = 0.55;
-    ctx.fillStyle = isSchoolThemeCanvas ? schoolInk : (opts.textColor || frame.ink);
-    ctx.fillText('MEMORA • LIVE BOOTH', canvasWidth / 2, canvasHeight - 34);
-    ctx.globalAlpha = 1;
-  }
+async function renderPhotoStrip(opts: RenderStripOptions): Promise<string> {
+  const layout = LAYOUTS.find((l) => l.id === opts.layout || (l.id === 'polaroid' && opts.layout === 'single') || (l.id === 'grid2x2' && opts.layout === 'grid4')) ?? LAYOUTS[0];
+  const images = await Promise.all(opts.shots.map(loadImage));
+
+  const geom = getLayoutGeometry(layout.id, images.length);
+  const canvas = document.createElement('canvas');
+  canvas.width = geom.canvasWidth;
+  canvas.height = geom.canvasHeight;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas is not available in this browser');
+
+  drawPhotoStripContent(ctx, geom.canvasWidth, geom.canvasHeight, images, opts, null, geom);
 
   return canvas.toDataURL('image/png');
 }
 
 async function renderPhotoStripGif(opts: RenderStripOptions): Promise<string> {
   const layout = LAYOUTS.find((l) => l.id === opts.layout || (l.id === 'polaroid' && opts.layout === 'single') || (l.id === 'grid2x2' && opts.layout === 'grid4')) ?? LAYOUTS[0];
-  const frame = FRAMES.find((f) => f.id === opts.frame) ?? FRAMES[0];
   const images = await Promise.all(opts.shots.map(loadImage));
 
-  const cols = layout.columns;
-  const rows = Math.ceil(images.length / cols);
-  const baseWidth = 112 + cols * PHOTO_WIDTH + (cols - 1) * 32;
-  const baseHeight = 112 + rows * PHOTO_HEIGHT + (rows - 1) * 32 + 200;
+  const geom = getLayoutGeometry(layout.id, images.length);
+  const baseWidth = geom.canvasWidth;
+  const baseHeight = geom.canvasHeight;
 
   // Optimized responsive dimensions for silky smooth mobile & desktop GIF generation
   const scale = Math.min(380 / baseWidth, 780 / baseHeight);
@@ -2686,264 +3435,7 @@ async function renderPhotoStripGif(opts: RenderStripOptions): Promise<string> {
   const drawStripFrame = (activeIdx: number | null) => {
     ctx.save();
     ctx.scale(scale, scale);
-
-    // Fill background paper
-    ctx.fillStyle = opts.frameColor || frame.paper;
-    ctx.fillRect(0, 0, baseWidth, baseHeight);
-
-    const isSchoolThemeCanvas = 
-      opts.templateId === 'event_school' ||
-      (!opts.templateId && (
-        opts.frameColor === '#0a1424' || 
-        opts.frameColor === '#091424' || 
-        opts.frameColor === '#fdfaf3' ||
-        opts.title.toLowerCase().includes('school') ||
-        opts.title.toLowerCase().includes('academy') ||
-        opts.title.toLowerCase().includes('collegiate') ||
-        opts.title.toLowerCase().includes('yearbook')
-      ));
-
-    const isLightCanvas = isLightColor(opts.frameColor || frame.paper);
-    const schoolGold = isLightCanvas ? '#855d10' : '#d4af37';
-    const schoolInk = isLightCanvas ? '#0c1a30' : '#fcf8ef';
-
-    if (isSchoolThemeCanvas) {
-      ctx.strokeStyle = schoolGold;
-      ctx.lineWidth = 4;
-      ctx.strokeRect(20, 20, baseWidth - 40, baseHeight - 40);
-      ctx.strokeStyle = isLightCanvas ? 'rgba(133, 93, 16, 0.45)' : 'rgba(212, 175, 55, 0.5)';
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(30, 30, baseWidth - 60, baseHeight - 60);
-    }
-
-    // Draw photos
-    const photoRects: { x: number; y: number; w: number; h: number }[] = [];
-    images.forEach((img, index) => {
-      const col = index % cols;
-      const row = Math.floor(index / cols);
-      const x = 56 + col * (PHOTO_WIDTH + 32);
-      const y = 56 + row * (PHOTO_HEIGHT + 32);
-      photoRects.push({ x, y, w: PHOTO_WIDTH, h: PHOTO_HEIGHT });
-
-      const s = Math.max(PHOTO_WIDTH / img.width, PHOTO_HEIGHT / img.height);
-      const drawW = img.width * s;
-      const drawH = img.height * s;
-
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(x, y, PHOTO_WIDTH, PHOTO_HEIGHT);
-      ctx.clip();
-      ctx.filter = opts.filterCss || 'none';
-
-      // Soften inactive photos slightly in spotlight frames to highlight active pose
-      if (activeIdx !== null && activeIdx !== index) {
-        ctx.globalAlpha = 0.72;
-      } else {
-        ctx.globalAlpha = 1.0;
-      }
-
-      ctx.drawImage(img, x + (PHOTO_WIDTH - drawW) / 2, y + (PHOTO_HEIGHT - drawH) / 2, drawW, drawH);
-      ctx.restore();
-
-      // Framing stroke
-      const isInkLight = opts.textColor ? isLightColor(opts.textColor) : frame.ink === '#fffdf7';
-      if (activeIdx === index) {
-        ctx.strokeStyle = isInkLight ? '#d8b86a' : '#2b211c';
-        ctx.lineWidth = 10;
-        ctx.strokeRect(x, y, PHOTO_WIDTH, PHOTO_HEIGHT);
-      } else if (isSchoolThemeCanvas) {
-        ctx.strokeStyle = isLightCanvas ? 'rgba(133, 93, 16, 0.7)' : 'rgba(212, 175, 55, 0.8)';
-        ctx.lineWidth = 4;
-        ctx.strokeRect(x, y, PHOTO_WIDTH, PHOTO_HEIGHT);
-      } else {
-        ctx.strokeStyle = isInkLight ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.1)';
-        ctx.lineWidth = 4;
-        ctx.strokeRect(x, y, PHOTO_WIDTH, PHOTO_HEIGHT);
-      }
-    });
-
-    // Draw school stickers & badges onto animated GIF canvas
-    if (isSchoolThemeCanvas && cols === 1) {
-      drawCanvasSchoolThemeAccents(ctx, baseWidth, baseHeight, isLightCanvas, photoRects);
-    }
-
-    const isBeachThemeCanvas =
-      opts.templateId === 'event_beach' ||
-      (!opts.templateId && (
-        opts.frameColor === '#fefcf6' ||
-        opts.title.toLowerCase().includes('beach') ||
-        opts.title.toLowerCase().includes('surf') ||
-        opts.title.toLowerCase().includes('bonfire') ||
-        opts.caption.toLowerCase().includes('beach') ||
-        opts.caption.toLowerCase().includes('surf')
-      ));
-
-    if (isBeachThemeCanvas && cols === 1) {
-      drawCanvasBeachThemeAccents(ctx, baseWidth, baseHeight, photoRects);
-    }
-
-    const isPartyThemeCanvas =
-      opts.templateId === 'event_party' ||
-      (!opts.templateId && (
-        opts.frameColor === '#0f1117' ||
-        opts.title.toLowerCase().includes('party') ||
-        opts.title.toLowerCase().includes('nightclub') ||
-        opts.title.toLowerCase().includes('dance') ||
-        opts.caption.toLowerCase().includes('party') ||
-        opts.caption.toLowerCase().includes('midnight')
-      ));
-
-    if (isPartyThemeCanvas && cols === 1) {
-      drawCanvasPartyThemeAccents(ctx, baseWidth, baseHeight, photoRects);
-    }
-
-    const isWeddingThemeCanvas =
-      opts.templateId === 'event_wedding' ||
-      (!opts.templateId && (
-        opts.frameColor === '#fcf8f4' ||
-        opts.frameColor === '#fbf8f1' ||
-        opts.title.toLowerCase().includes('wedding') ||
-        opts.title.toLowerCase().includes('matrimony') ||
-        opts.title.toLowerCase().includes('nuptial') ||
-        opts.title.toLowerCase().includes('vow') ||
-        opts.caption.toLowerCase().includes('wedding') ||
-        opts.caption.toLowerCase().includes('reception')
-      ));
-
-    if (isWeddingThemeCanvas && cols === 1) {
-      drawCanvasWeddingThemeAccents(ctx, baseWidth, baseHeight, photoRects);
-    }
-
-    const isBirthdayThemeCanvas =
-      opts.templateId === 'event_birthday' ||
-      (!opts.templateId && (
-        opts.frameColor === '#fffdf9' ||
-        (opts.frameColor === '#ffffff' && (opts.title.toLowerCase().includes('birthday') || opts.caption.toLowerCase().includes('birthday'))) ||
-        opts.title.toLowerCase().includes('birthday') ||
-        opts.title.toLowerCase().includes('bash') ||
-        opts.title.toLowerCase().includes('celebrate') ||
-        opts.caption.toLowerCase().includes('birthday') ||
-        opts.caption.toLowerCase().includes('celebration')
-      ));
-
-    const isCorporateThemeCanvas =
-      opts.templateId === 'event_corporate' ||
-      (!opts.templateId && (
-        opts.frameColor === '#f8fafc' ||
-        opts.title.toLowerCase().includes('corporate') ||
-        opts.title.toLowerCase().includes('summit') ||
-        opts.title.toLowerCase().includes('gala') ||
-        opts.caption.toLowerCase().includes('corporate') ||
-        opts.caption.toLowerCase().includes('innovation')
-      ));
-
-    const isGraduationThemeCanvas =
-      opts.templateId === 'event_graduation' ||
-      (!opts.templateId && (
-        opts.frameColor === '#0a1128' ||
-        opts.title.toLowerCase().includes('graduation') ||
-        opts.title.toLowerCase().includes('commencement') ||
-        opts.caption.toLowerCase().includes('honors') ||
-        opts.caption.toLowerCase().includes('graduate')
-      ));
-
-    if (isBirthdayThemeCanvas && cols === 1) {
-      drawCanvasBirthdayThemeAccents(ctx, baseWidth, baseHeight, photoRects);
-    }
-
-    ctx.filter = 'none';
-    ctx.globalAlpha = 1;
-
-    // Bottom footer area
-    const footerTop = baseHeight - 200 + 24;
-    ctx.fillStyle = isSchoolThemeCanvas
-      ? schoolInk
-      : isBeachThemeCanvas
-      ? '#0f172a'
-      : isPartyThemeCanvas
-      ? '#f4f4f5'
-      : isWeddingThemeCanvas
-      ? '#1f1b18'
-      : isBirthdayThemeCanvas
-      ? '#18181b'
-      : isCorporateThemeCanvas
-      ? '#0f172a'
-      : isGraduationThemeCanvas
-      ? '#fcf8ef'
-      : (opts.textColor || frame.ink);
-    ctx.textAlign = 'center';
-    ctx.font = 'bold 72px "Cormorant Garamond", Georgia, serif';
-    ctx.fillText(
-      isSchoolThemeCanvas
-        ? 'CAMPUS DAYS • SCHOOL YEAR 2026–2027'
-        : isBeachThemeCanvas
-        ? 'GOOD VIBES, GREAT TIMES'
-        : isPartyThemeCanvas
-        ? 'GOOD FRIENDS. GREAT NIGHT'
-        : isWeddingThemeCanvas
-        ? 'FOREVER BEGINS'
-        : isBirthdayThemeCanvas
-        ? 'CELEBRATE EVERY LITTLE MOMENT'
-        : isCorporateThemeCanvas
-        ? 'BUILT TOGETHER. ACHIEVED TOGETHER'
-        : isGraduationThemeCanvas
-        ? 'THE NEXT CHAPTER'
-        : opts.title.toUpperCase().slice(0, 28),
-      baseWidth / 2,
-      footerTop + 58
-    );
-
-    ctx.fillStyle = isSchoolThemeCanvas
-      ? schoolGold
-      : isBeachThemeCanvas
-      ? '#0284c7'
-      : isPartyThemeCanvas
-      ? '#ec4899'
-      : isWeddingThemeCanvas
-      ? '#b8860b'
-      : isBirthdayThemeCanvas
-      ? '#d97706'
-      : isCorporateThemeCanvas
-      ? '#2563eb'
-      : isGraduationThemeCanvas
-      ? '#d4af37'
-      : (opts.textColor || frame.ink);
-    if (isSchoolThemeCanvas) {
-      ctx.font = 'bold 28px "JetBrains Mono", monospace';
-      ctx.fillText('MEMORIES WITH CLASSMATES • EVERYDAY MOMENTS', baseWidth / 2, footerTop + 116);
-    } else if (isBeachThemeCanvas) {
-      ctx.font = 'bold 28px "JetBrains Mono", monospace';
-      ctx.fillText('SUN • SAND • SEA • MEMORIES', baseWidth / 2, footerTop + 116);
-    } else if (isPartyThemeCanvas) {
-      ctx.font = 'bold 28px "JetBrains Mono", monospace';
-      ctx.fillText('DANCE • LAUGH • CELEBRATE • REPEAT', baseWidth / 2, footerTop + 116);
-    } else if (isWeddingThemeCanvas) {
-      ctx.font = 'bold 28px "JetBrains Mono", monospace';
-      ctx.fillText('TWO HEARTS • ONE BEAUTIFUL JOURNEY', baseWidth / 2, footerTop + 116);
-    } else if (isBirthdayThemeCanvas) {
-      ctx.font = 'bold 28px "JetBrains Mono", monospace';
-      ctx.fillText('GOOD TIMES • BIG SMILES • GREAT MEMORIES', baseWidth / 2, footerTop + 116);
-    } else if (isCorporateThemeCanvas) {
-      ctx.font = 'bold 28px "JetBrains Mono", monospace';
-      ctx.fillText('CONNECT • COLLABORATE • CELEBRATE', baseWidth / 2, footerTop + 116);
-    } else if (isGraduationThemeCanvas) {
-      ctx.font = 'bold 28px "JetBrains Mono", monospace';
-      ctx.fillText('ONE JOURNEY ENDS. ANOTHER BEGINS', baseWidth / 2, footerTop + 116);
-    } else if (opts.caption.trim()) {
-      ctx.font = 'italic 44px "Cormorant Garamond", Georgia, serif';
-      ctx.globalAlpha = 0.85;
-      ctx.fillText(opts.caption.slice(0, 44), baseWidth / 2, footerTop + 126);
-      ctx.globalAlpha = 1;
-    }
-
-    if (opts.watermark !== false) {
-      ctx.font = '500 24px "JetBrains Mono", monospace';
-      ctx.globalAlpha = 0.55;
-      ctx.fillStyle = isSchoolThemeCanvas ? schoolInk : (opts.textColor || frame.ink);
-      ctx.fillText('MEMORA • LIVE BOOTH', baseWidth / 2, baseHeight - 34);
-      ctx.globalAlpha = 1;
-    }
-
+    drawPhotoStripContent(ctx, baseWidth, baseHeight, images, opts, activeIdx, geom);
     ctx.restore();
   };
 
@@ -2968,6 +3460,7 @@ async function renderPhotoStripGif(opts: RenderStripOptions): Promise<string> {
   const blob = new Blob([bytes as unknown as BlobPart], { type: 'image/gif' });
   return URL.createObjectURL(blob);
 }
+
 
 function triggerDownload(dataUrl: string, filename: string, eventName = 'Memora Booth') {
   try {
@@ -3039,6 +3532,13 @@ export interface MemoraBoothProps {
   eventName?: string;
   eventSubtitle?: string;
   eventType?: string;
+  eventSlug?: string;
+  eventPlan?: 'free' | 'pro' | 'studio';
+  isPremiumEvent?: boolean;
+  eventLayout?: string;
+  eventCountdown?: number;
+  eventPrimaryColor?: string;
+  eventSecondaryColor?: string;
   exitHref?: string;
 }
 
@@ -3046,17 +3546,51 @@ export function MemoraBooth({
   eventName = 'Memora Booth',
   eventSubtitle = 'Try it now',
   eventType,
+  eventSlug,
+  eventPlan,
+  isPremiumEvent,
+  eventLayout,
+  eventCountdown,
+  eventPrimaryColor,
+  eventSecondaryColor,
   exitHref = '/',
 }: MemoraBoothProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const initialDetectedType = eventType || 
-    ALL_EVENT_TYPE_IDS.find((t) => 
-      eventName.toLowerCase().includes(t) || 
-      exitHref.toLowerCase().includes(`/e/${t}`)
-    ) || null;
+  const resolveInitialEventType = (): string | null => {
+    // 1. Direct prop eventType takes absolute precedence
+    if (eventType && (ALL_EVENT_TYPE_IDS.includes(eventType) || PRO_EVENT_THEME_TEMPLATES[eventType])) {
+      return eventType;
+    }
+    // 2. Lookup in local storage by slug, id, or exact name
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('memora_events');
+        if (stored) {
+          const list = JSON.parse(stored);
+          if (Array.isArray(list)) {
+            const cleanSlug = (eventSlug || exitHref.replace(/^\/e\//, '').replace(/\/.*$/, '')).toLowerCase().trim();
+            const cleanName = eventName ? eventName.toLowerCase().trim() : '';
+            const match = list.find((e: any) => {
+              const s = (e.slug || '').toLowerCase().trim();
+              const id = String(e.id || '').toLowerCase().trim();
+              const n = (e.name || '').toLowerCase().trim();
+              return (cleanSlug && (s === cleanSlug || id === cleanSlug)) || (cleanName && n === cleanName);
+            });
+            if (match?.eventType) return match.eventType;
+          }
+        }
+      } catch {}
+    }
+    // 3. Exact slug match only (e.g., /e/wedding or /e/beach)
+    const directSlugType = ALL_EVENT_TYPE_IDS.find((t) => exitHref.toLowerCase().startsWith(`/e/${t}`));
+    if (directSlugType) return directSlugType;
 
+    return null;
+  };
+
+  const initialDetectedType = resolveInitialEventType();
   const [matchedEventType, setMatchedEventType] = useState<string | null>(initialDetectedType);
   const [status, setStatus] = useState<'idle' | 'requesting' | 'ready' | 'error'>('idle');
   const [errorKind, setErrorKind] = useState<string | null>(null);
@@ -3073,10 +3607,33 @@ export function MemoraBooth({
     ...ALL_SYSTEM_TEMPLATES,
   ]);
   const [showAllTemplates, setShowAllTemplates] = useState<boolean>(false);
-  const [layoutId, setLayoutId] = useState<string>('strip3');
+  const [showAllStudioTemplates, setShowAllStudioTemplates] = useState<boolean>(false);
+
+  // Map eventLayout to layoutId if provided
+  const initialLayoutId = React.useMemo(() => {
+    if (eventLayout) {
+      const map: Record<string, string> = {
+        strip: 'strip3',
+        strip3: 'strip3',
+        strip4: 'strip4',
+        filmstrip: 'filmstrip',
+        grid2x2: 'grid2x2',
+        grid2x3: 'grid2x3',
+        duo: 'duo',
+        polaroid: 'polaroid',
+      };
+      if (map[eventLayout]) return map[eventLayout];
+    }
+    if (initialDetectedType && PRO_EVENT_THEME_TEMPLATES[initialDetectedType]) {
+      return getTemplateNativeLayoutId(PRO_EVENT_THEME_TEMPLATES[initialDetectedType].layout, PRO_EVENT_THEME_TEMPLATES[initialDetectedType].id);
+    }
+    return 'strip3';
+  }, [eventLayout, initialDetectedType]);
+
+  const [layoutId, setLayoutId] = useState<string>(initialLayoutId);
   const [filterId, setFilterId] = useState<string>('original');
   const [frameId, setFrameId] = useState<string>('classic');
-  const [countdownDuration, setCountdownDuration] = useState<number>(3);
+  const [countdownDuration, setCountdownDuration] = useState<number>(eventCountdown ?? 3);
 
   const [currentCountdown, setCurrentCountdown] = useState<number | null>(null);
   const [isFlashing, setIsFlashing] = useState<boolean>(false);
@@ -3090,7 +3647,15 @@ export function MemoraBooth({
   const [renderError, setRenderError] = useState<string | null>(null);
   const [activePlanConfig, setActivePlanConfig] = useState<PlanConfig>(DEFAULT_PLANS.free);
 
+  const stripExportRef = useRef<HTMLDivElement>(null);
   const hasUserSelectedTemplateRef = useRef<boolean>(false);
+
+  // Synchronize matchedEventType when eventType prop updates
+  useEffect(() => {
+    if (eventType && (ALL_EVENT_TYPE_IDS.includes(eventType) || PRO_EVENT_THEME_TEMPLATES[eventType])) {
+      setMatchedEventType(eventType);
+    }
+  }, [eventType]);
 
   // Load custom templates if configured by admin in localStorage
   useEffect(() => {
@@ -3120,7 +3685,7 @@ export function MemoraBooth({
 
   // Sync plan capability: defaults to the Admin's Free Plan for all general users and listeners
   useEffect(() => {
-    let matchedPlanKey: 'free' | 'pro' | 'studio' = 'free';
+    let matchedPlanKey: 'free' | 'pro' | 'studio' = eventPlan || (isPremiumEvent ? 'pro' : 'free');
 
     // Check if this booth is explicitly attached to a paid event
     if (eventName && eventName !== 'Memora Booth') {
@@ -3129,10 +3694,14 @@ export function MemoraBooth({
         if (storedEvents) {
           const events = JSON.parse(storedEvents);
           if (Array.isArray(events)) {
-            const match = events.find((e: any) => 
-              (e.name && e.name.toLowerCase() === eventName.toLowerCase()) || 
-              (e.slug && e.slug === eventName.toLowerCase())
-            );
+            const cleanSlug = (eventSlug || exitHref.replace(/^\/e\//, '').replace(/\/.*$/, '')).toLowerCase().trim();
+            const cleanName = eventName.toLowerCase().trim();
+            const match = events.find((e: any) => {
+              const s = (e.slug || '').toLowerCase().trim();
+              const id = String(e.id || '').toLowerCase().trim();
+              const n = (e.name || '').toLowerCase().trim();
+              return (cleanSlug && (s === cleanSlug || id === cleanSlug)) || (cleanName && n === cleanName);
+            });
             if (match) {
               if (match.eventType) {
                 setMatchedEventType(match.eventType);
@@ -3227,44 +3796,44 @@ export function MemoraBooth({
       clearInterval(interval);
       unsub();
     };
-  }, [eventName]);
+  }, [eventName, eventSlug, eventPlan, isPremiumEvent, exitHref]);
 
-  // Set default PRO event template if matchedEventType is present and user hasn't selected another template
-  useEffect(() => {
-    if (!hasUserSelectedTemplateRef.current && matchedEventType && PRO_EVENT_THEME_TEMPLATES[matchedEventType]) {
-      const eventTpl = PRO_EVENT_THEME_TEMPLATES[matchedEventType];
-      if (isTemplateUnlocked(activePlanConfig, eventTpl.id)) {
-        setTemplateId(eventTpl.id);
-        const nativeLayout = getTemplateNativeLayoutId(eventTpl.layout, eventTpl.id);
-        if (nativeLayout && isLayoutUnlocked(activePlanConfig, nativeLayout)) {
-          setLayoutId(nativeLayout);
+  const isStudioPlan = React.useMemo(() => {
+    if (eventPlan === 'studio') return true;
+    if (activePlanConfig?.id === 'studio') return true;
+    if (typeof window !== 'undefined') {
+      try {
+        const rawUser = localStorage.getItem('memora_user');
+        if (rawUser) {
+          const u = JSON.parse(rawUser);
+          if (
+            (u.subscription_plan === 'studio' || u.plan === 'studio') &&
+            (u.subscription_status === 'active' || u.subscription_status === 'past_due' || !u.subscription_status)
+          ) {
+            return true;
+          }
         }
-      }
-    }
-  }, [matchedEventType, activePlanConfig]);
-
-  // Ensure an unlocked layout and template are chosen on initial load or plan change
-  useEffect(() => {
-    if (activePlanConfig) {
-      let currentTpl = allTemplates.find((t) => t.id === templateId && isTemplateUnlocked(activePlanConfig, t.id));
-      if (!currentTpl) {
-        currentTpl = allTemplates.find((t) => isTemplateUnlocked(activePlanConfig, t.id));
-        if (currentTpl) setTemplateId(currentTpl.id);
-      }
-
-      if (currentTpl) {
-        const nativeLayout = getTemplateNativeLayoutId(currentTpl.layout, currentTpl.id);
-        if (isLayoutUnlocked(activePlanConfig, nativeLayout) && (!layoutId || !isLayoutUnlocked(activePlanConfig, layoutId))) {
-          setLayoutId(nativeLayout);
-        } else if (!isLayoutUnlocked(activePlanConfig, layoutId)) {
-          const firstUnlocked = LAYOUTS.find((l) => isLayoutUnlocked(activePlanConfig, l.id));
-          if (firstUnlocked) setLayoutId(firstUnlocked.id);
+        const rawEvents = localStorage.getItem('memora_events');
+        if (rawEvents) {
+          const events = JSON.parse(rawEvents);
+          if (Array.isArray(events)) {
+            const cleanSlug = (eventSlug || exitHref.replace(/^\/e\//, '').replace(/\/.*$/, '')).toLowerCase().trim();
+            const cleanName = (eventName || '').toLowerCase().trim();
+            const match = events.find((e: any) => {
+              const s = (e.slug || '').toLowerCase().trim();
+              const id = String(e.id || '').toLowerCase().trim();
+              const n = (e.name || '').toLowerCase().trim();
+              return (cleanSlug && (s === cleanSlug || id === cleanSlug)) || (cleanName && n === cleanName);
+            });
+            if (match?.plan === 'studio') return true;
+          }
         }
-      }
+      } catch {}
     }
-  }, [activePlanConfig, allTemplates, layoutId, templateId]);
+    return false;
+  }, [eventPlan, activePlanConfig, eventSlug, exitHref, eventName]);
 
-  // Separate PRO Event Template and Free Studio Templates
+  // Separate PRO / Studio Pro Event Template and Free Studio Templates
   const activeProTemplate = React.useMemo(() => {
     if (matchedEventType && PRO_EVENT_THEME_TEMPLATES[matchedEventType]) {
       return PRO_EVENT_THEME_TEMPLATES[matchedEventType];
@@ -3272,21 +3841,119 @@ export function MemoraBooth({
     return PRO_EVENT_THEME_TEMPLATES.party;
   }, [matchedEventType]);
 
+  const proEventTemplates = React.useMemo(() => {
+    const seen = new Set<string>();
+    const list: AvailableTemplateOption[] = [];
+    
+    // Put activeProTemplate first if present
+    if (activeProTemplate) {
+      seen.add(activeProTemplate.id);
+      list.push(activeProTemplate);
+    }
+    
+    // Add remaining pro event templates
+    ALL_PRO_EVENT_TEMPLATES.forEach((tpl) => {
+      if (!seen.has(tpl.id)) {
+        seen.add(tpl.id);
+        list.push(tpl);
+      }
+    });
+
+    if (isStudioPlan) {
+      return list.map((tpl) => ({
+        ...tpl,
+        name: tpl.name.replace(/^Pro Event\s*[–—-]\s*/i, 'Studio Pro – '),
+        badge: 'Studio Pro',
+      }));
+    }
+
+    return list;
+  }, [activeProTemplate, isStudioPlan]);
+
+  // Dedicated PRO Event Template matching the created event is ALWAYS unlocked & shootable in this booth!
+  const isTemplateAvailable = useCallback(
+    (tplId: string): boolean => {
+      if (isStudioPlan) {
+        return true;
+      }
+      if (activeProTemplate && tplId === activeProTemplate.id) {
+        return true;
+      }
+      return isTemplateUnlocked(activePlanConfig, tplId);
+    },
+    [activeProTemplate, activePlanConfig, isStudioPlan]
+  );
+
+  const isLayoutAvailable = useCallback(
+    (lId: string): boolean => {
+      if (isStudioPlan) {
+        return true;
+      }
+      if (activeProTemplate) {
+        const native = getTemplateNativeLayoutId(activeProTemplate.layout, activeProTemplate.id);
+        if (native && lId === native) return true;
+      }
+      return isLayoutUnlocked(activePlanConfig, lId);
+    },
+    [activeProTemplate, activePlanConfig, isStudioPlan]
+  );
+
+  // Set default PRO event template if matchedEventType is present and user hasn't selected another template
+  useEffect(() => {
+    if (!hasUserSelectedTemplateRef.current && matchedEventType && PRO_EVENT_THEME_TEMPLATES[matchedEventType]) {
+      const eventTpl = PRO_EVENT_THEME_TEMPLATES[matchedEventType];
+      setTemplateId(eventTpl.id);
+      const nativeLayout = getTemplateNativeLayoutId(eventTpl.layout, eventTpl.id);
+      if (nativeLayout) {
+        setLayoutId(nativeLayout);
+      }
+    }
+  }, [matchedEventType]);
+
+  // Ensure an unlocked layout and template are chosen on initial load or plan change
+  useEffect(() => {
+    if (activePlanConfig) {
+      let currentTpl = allTemplates.find((t) => t.id === templateId && isTemplateAvailable(t.id));
+      if (!currentTpl) {
+        if (activeProTemplate && isTemplateAvailable(activeProTemplate.id)) {
+          setTemplateId(activeProTemplate.id);
+        } else {
+          currentTpl = allTemplates.find((t) => isTemplateAvailable(t.id));
+          if (currentTpl) setTemplateId(currentTpl.id);
+        }
+      }
+
+      if (currentTpl) {
+        const nativeLayout = getTemplateNativeLayoutId(currentTpl.layout, currentTpl.id);
+        if (isLayoutAvailable(nativeLayout) && (!layoutId || !isLayoutAvailable(layoutId))) {
+          setLayoutId(nativeLayout);
+        } else if (!isLayoutAvailable(layoutId)) {
+          const firstUnlocked = LAYOUTS.find((l) => isLayoutAvailable(l.id));
+          if (firstUnlocked) setLayoutId(firstUnlocked.id);
+        }
+      }
+    }
+  }, [activePlanConfig, allTemplates, layoutId, templateId, isTemplateAvailable, isLayoutAvailable, activeProTemplate]);
+
   // Only display unlocked templates for the active plan
   const unlockedTemplates = React.useMemo(() => {
-    return allTemplates.filter((t) => isTemplateUnlocked(activePlanConfig, t.id));
-  }, [allTemplates, activePlanConfig]);
+    return allTemplates.filter((t) => isTemplateAvailable(t.id));
+  }, [allTemplates, isTemplateAvailable]);
 
   const freeTemplates = React.useMemo(() => {
-    return allTemplates.filter((t) => !t.id.startsWith('event_') && isTemplateUnlocked(activePlanConfig, t.id));
-  }, [allTemplates, activePlanConfig]);
+    return allTemplates.filter((t) => !t.id.startsWith('event_') && isTemplateAvailable(t.id));
+  }, [allTemplates, isTemplateAvailable]);
 
   const visibleFreeTemplates = showAllTemplates || freeTemplates.length <= 6 ? freeTemplates : freeTemplates.slice(0, 6);
+  const visibleProEventTemplates =
+    showAllStudioTemplates || proEventTemplates.length <= 4
+      ? proEventTemplates
+      : proEventTemplates.slice(0, 4);
 
   // Only display unlocked strip layouts for the active plan
   const unlockedLayouts = React.useMemo(() => {
-    return LAYOUTS.filter((l) => isLayoutUnlocked(activePlanConfig, l.id));
-  }, [activePlanConfig]);
+    return LAYOUTS.filter((l) => isLayoutAvailable(l.id));
+  }, [isLayoutAvailable]);
 
   const selectedTemplate = allTemplates.find((t) => t.id === templateId) || ALL_SYSTEM_TEMPLATES[0];
   const isLight = isLightColor(selectedTemplate.frameColor);
@@ -3320,6 +3987,10 @@ export function MemoraBooth({
     selectedTemplate.id === 'event_graduation' ||
     selectedTemplate.category === 'graduation_event';
 
+  const isDebutTheme =
+    selectedTemplate.id === 'event_debut' ||
+    selectedTemplate.category === 'debut_event';
+
   const isSchoolLight = isSchoolTheme
     ? (selectedTemplate.id === 'yearbook_alumni' || isLightColor(selectedTemplate.frameColor))
     : isLight;
@@ -3341,15 +4012,15 @@ export function MemoraBooth({
     pillBorder: isSchoolLight ? '1px solid #855d10' : '1px solid rgba(212, 175, 55, 0.5)',
   };
 
-  const isTemplateActiveUnlocked = isTemplateUnlocked(activePlanConfig, templateId);
-  const isLayoutActiveUnlocked = isLayoutUnlocked(activePlanConfig, layoutId);
+  const isTemplateActiveUnlocked = isTemplateAvailable(templateId);
+  const isLayoutActiveUnlocked = isLayoutAvailable(layoutId);
   const isShootable = isTemplateActiveUnlocked && isLayoutActiveUnlocked;
 
   const handleSelectTemplate = (tpl: AvailableTemplateOption) => {
     hasUserSelectedTemplateRef.current = true;
     setTemplateId(tpl.id);
     const nativeLayout = getTemplateNativeLayoutId(tpl.layout, tpl.id);
-    if (nativeLayout && isLayoutUnlocked(activePlanConfig, nativeLayout)) {
+    if (nativeLayout && isLayoutAvailable(nativeLayout)) {
       setLayoutId(nativeLayout);
     }
   };
@@ -3367,6 +4038,7 @@ export function MemoraBooth({
 
   const activeLayout = LAYOUTS.find((l) => l.id === layoutId || (l.id === 'polaroid' && layoutId === 'single') || (l.id === 'grid2x2' && layoutId === 'grid4')) ?? LAYOUTS[0];
   const activeFilter = FILTERS.find((f) => f.id === filterId) ?? FILTERS[0];
+  const activeFrame = FRAMES.find((f) => f.id === frameId) ?? FRAMES[0];
   const photoSlots = Array.from({ length: activeLayout.shots });
 
   const stopCamera = useCallback(() => {
@@ -3449,7 +4121,7 @@ export function MemoraBooth({
     const video = videoRef.current;
     if (!video || !video.videoWidth) return null;
 
-    const targetRatio = 3 / 4;
+    const targetRatio = 4 / 3;
     const currentRatio = video.videoWidth / video.videoHeight;
     let cropW = video.videoWidth;
     let cropH = video.videoHeight;
@@ -3598,7 +4270,779 @@ export function MemoraBooth({
     return () => {
       isMounted = false;
     };
-  }, [phase, capturedShots, layoutId, frameId, activeFilter.css, caption, eventName, isGifAllowed, activePlanConfig, selectedTemplate.frameColor, selectedTemplate.textColor]);
+  }, [
+    phase,
+    capturedShots,
+    layoutId,
+    frameId,
+    activeFilter.css,
+    caption,
+    eventName,
+    isGifAllowed,
+    activePlanConfig,
+    templateId,
+    selectedTemplate.id,
+    selectedTemplate.name,
+    selectedTemplate.badge,
+    selectedTemplate.frameColor,
+    selectedTemplate.textColor,
+  ]);
+
+  // Single source of truth for the strip design: used for the live preview and,
+  // with captured shots, rendered off-screen and rasterized as the final strip.
+  const renderStripDesign = (shots: string[] = [], designRef?: React.Ref<HTMLDivElement>) => {
+    const photoSlots = Array.from({ length: Math.max(activeLayout.shots, shots.length) });
+
+    return (
+      <div
+        ref={designRef}
+        className={`rounded-xl transition-all duration-300 shadow-2xl relative p-3.5 flex flex-col items-center h-auto min-h-fit self-start shrink-0 ${
+          layoutId === 'grid2x2' || layoutId === 'grid2x3' ? 'w-72 sm:w-80' : 'w-60'
+        }`}
+      style={{
+        backgroundColor: isSchoolTheme
+          ? schoolPalette.bg
+          : isBeachTheme
+          ? (frameId !== 'classic' ? activeFrame.paper : '#f0f9ff')
+          : isPartyTheme
+          ? (frameId !== 'classic' ? activeFrame.paper : '#0f1117')
+          : isWeddingTheme
+          ? (frameId !== 'classic' ? activeFrame.paper : '#fcf8f4')
+          : isBirthdayTheme
+          ? (frameId !== 'classic' ? activeFrame.paper : '#fffdf9')
+          : isCorporateTheme
+          ? (frameId !== 'classic' ? activeFrame.paper : '#f8fafc')
+          : isGraduationTheme
+          ? (frameId !== 'classic' ? activeFrame.paper : '#0a1128')
+          : isDebutTheme
+          ? (frameId !== 'classic' ? activeFrame.paper : '#fff5f7')
+          : (frameId !== 'classic' ? activeFrame.paper : selectedTemplate.frameColor),
+        color: isSchoolTheme
+          ? schoolPalette.textPrimary
+          : isBeachTheme
+          ? (frameId !== 'classic' ? activeFrame.ink : '#0f172a')
+          : isPartyTheme
+          ? (frameId !== 'classic' ? activeFrame.ink : '#f4f4f5')
+          : isWeddingTheme
+          ? (frameId !== 'classic' ? activeFrame.ink : '#1f1b18')
+          : isBirthdayTheme
+          ? (frameId !== 'classic' ? activeFrame.ink : '#18181b')
+          : isCorporateTheme
+          ? (frameId !== 'classic' ? activeFrame.ink : '#0f172a')
+          : isGraduationTheme
+          ? (frameId !== 'classic' ? activeFrame.ink : '#fcf8ef')
+          : isDebutTheme
+          ? (frameId !== 'classic' ? activeFrame.ink : '#831843')
+          : (frameId !== 'classic' ? activeFrame.ink : selectedTemplate.textColor),
+        border: isSchoolTheme
+          ? schoolPalette.outerBorder
+          : isBeachTheme
+          ? '2px solid rgba(2, 132, 199, 0.45)'
+          : isPartyTheme
+          ? '2px solid rgba(236, 72, 153, 0.65)'
+          : isWeddingTheme
+          ? '2px solid rgba(184, 134, 11, 0.45)'
+          : isBirthdayTheme
+          ? '2px solid rgba(245, 158, 11, 0.5)'
+          : isCorporateTheme
+          ? '2px solid rgba(37, 99, 235, 0.45)'
+          : isGraduationTheme
+          ? '2px solid rgba(212, 175, 55, 0.65)'
+          : isDebutTheme
+          ? '2px solid rgba(219, 39, 119, 0.45)'
+          : `1px solid ${isLight ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.18)'}`,
+        boxShadow: isSchoolTheme
+          ? schoolPalette.outerShadow
+          : isBeachTheme
+          ? '0 0 24px rgba(2, 132, 199, 0.18), 0 0 0 1px rgba(2, 132, 199, 0.25)'
+          : isPartyTheme
+          ? '0 0 25px rgba(236, 72, 153, 0.25), 0 0 0 1px rgba(236, 72, 153, 0.3)'
+          : isWeddingTheme
+          ? '0 0 20px rgba(184, 134, 11, 0.12), 0 0 0 1px rgba(184, 134, 11, 0.2)'
+          : isBirthdayTheme
+          ? '0 0 22px rgba(245, 158, 11, 0.16), 0 0 0 1px rgba(245, 158, 11, 0.25)'
+          : isCorporateTheme
+          ? '0 0 22px rgba(37, 99, 235, 0.14), 0 0 0 1px rgba(37, 99, 235, 0.25)'
+          : isGraduationTheme
+          ? '0 0 24px rgba(212, 175, 55, 0.2), 0 0 0 1px rgba(212, 175, 55, 0.3)'
+          : isDebutTheme
+          ? '0 0 24px rgba(219, 39, 119, 0.18), 0 0 0 1px rgba(219, 39, 119, 0.25)'
+          : undefined,
+      }}
+    >
+      {/* Top Header Inscription */}
+      {isSchoolTheme ? (
+        <div className="w-full text-center pb-2 pt-0.5 border-b mb-2" style={{ borderColor: schoolPalette.borderGold }}>
+          <div className="flex items-center justify-center gap-1.5 text-[7.5px] font-mono uppercase tracking-[0.25em]" style={{ color: schoolPalette.textSecondary }}>
+            <span>★</span>
+            <span>GOOD DAYS • GREAT MEMORIES</span>
+            <span>★</span>
+          </div>
+          <h3 className="font-serif text-xs font-bold tracking-wider uppercase mt-1" style={{ color: schoolPalette.textPrimary }}>
+            OUR SCHOOL ERA
+          </h3>
+          <div className="flex items-center justify-center gap-1.5 mt-1 opacity-90">
+            <span className="h-px w-4" style={{ backgroundColor: schoolPalette.borderGold }} />
+            <span className="text-[7px] font-mono tracking-widest uppercase font-semibold" style={{ color: schoolPalette.textSecondary }}>
+              SCHOOL YEAR 2026–2027
+            </span>
+            <span className="h-px w-4" style={{ backgroundColor: schoolPalette.borderGold }} />
+          </div>
+        </div>
+      ) : isBeachTheme ? (
+        <div className="w-full text-center pb-2 pt-0.5 border-b mb-2" style={{ borderColor: 'rgba(2, 132, 199, 0.35)' }}>
+          <div className="flex items-center justify-center gap-1.5 text-[7.5px] font-mono uppercase tracking-[0.2em]" style={{ color: '#0284c7' }}>
+            <span>🌴</span>
+            <span>LET THE GOOD TIMES ROLL</span>
+            <span>🌴</span>
+          </div>
+          <h3 className="font-serif text-xs font-bold tracking-wider uppercase mt-0.5" style={{ color: '#0f172a' }}>
+            GOOD VIBES, GREAT TIMES
+          </h3>
+          <p className="text-[7px] font-mono tracking-wider opacity-85 mt-0.5" style={{ color: '#0284c7' }}>
+            Sun • Sand • Sea • Memories
+          </p>
+        </div>
+      ) : isPartyTheme ? (
+        <div className="w-full text-center pb-2 pt-0.5 border-b mb-2 relative" style={{ borderColor: 'rgba(236, 72, 153, 0.5)' }}>
+          <div className="absolute left-1.5 top-0 pointer-events-none transform -rotate-6 drop-shadow-xs">
+            <DiscoBallIcon size={18} />
+          </div>
+          <div className="absolute left-7 -top-1 pointer-events-none transform rotate-12">
+            <PartySparklesIcon variant="star" size={9} />
+          </div>
+          <div className="absolute right-12 -top-1 pointer-events-none transform -rotate-12">
+            <PartySparklesIcon variant="cross" size={9} />
+          </div>
+          <div className="absolute right-6.5 top-0 pointer-events-none transform -rotate-6 drop-shadow-xs">
+            <GlossyBalloonsIcon size={16} />
+          </div>
+          <div className="absolute right-1 top-0 pointer-events-none transform rotate-6 drop-shadow-xs">
+            <PartyPopperIcon size={18} />
+          </div>
+          <div className="flex items-center justify-center gap-1.5 text-[7.5px] font-mono uppercase tracking-[0.2em]" style={{ color: '#ec4899' }}>
+            <span>PARTY NIGHT</span>
+          </div>
+          <h3 className="font-serif text-xs font-bold tracking-wider uppercase mt-0.5" style={{ color: '#f4f4f5' }}>
+            GOOD FRIENDS. GREAT NIGHT
+          </h3>
+          <p className="text-[7px] font-mono tracking-wider opacity-85 mt-0.5" style={{ color: '#ec4899' }}>
+            Dance • Laugh • Celebrate • Repeat
+          </p>
+        </div>
+      ) : isWeddingTheme ? (
+        <div className="w-full text-center pb-2 pt-0.5 border-b mb-2 relative" style={{ borderColor: 'rgba(184, 134, 11, 0.35)' }}>
+          <div className="absolute left-1.5 top-0.5 pointer-events-none flex items-center gap-1">
+            <WeddingRingsIcon size={18} className="transform -rotate-6 drop-shadow-xs" />
+            <WeddingSparklesIcon variant="star" size={8} className="opacity-80" />
+          </div>
+          <div className="absolute right-1.5 top-0.5 pointer-events-none flex items-center gap-1">
+            <WeddingHeartIcon size={14} className="transform rotate-6 drop-shadow-xs" />
+            <WeddingBouquetIcon size={18} className="transform rotate-6 drop-shadow-xs" />
+          </div>
+          <div className="flex items-center justify-center gap-1.5 text-[7px] font-mono uppercase tracking-[0.22em] font-semibold" style={{ color: '#b8860b' }}>
+            <span>WEDDING CELEBRATION</span>
+          </div>
+          <h3 className="font-serif text-xs font-bold tracking-[0.2em] uppercase mt-0.5" style={{ color: '#1f1b18' }}>
+            FOREVER BEGINS
+          </h3>
+          <p className="text-[7px] font-mono tracking-wider opacity-85 mt-0.5 italic" style={{ color: '#855d10' }}>
+            Two hearts • One beautiful journey
+          </p>
+        </div>
+      ) : isBirthdayTheme ? (
+        <div className="w-full text-center pb-2 pt-0.5 border-b mb-2 relative" style={{ borderColor: 'rgba(245, 158, 11, 0.4)' }}>
+          <div className="absolute left-1.5 top-0.5 pointer-events-none flex items-center gap-1">
+            <BirthdayCakeIcon size={16} className="transform -rotate-6 drop-shadow-xs" />
+            <BirthdaySparklesIcon variant="star" size={7} className="opacity-80" />
+          </div>
+          <div className="absolute right-1.5 top-0.5 pointer-events-none flex items-center gap-1">
+            <BirthdaySparklesIcon variant="cross" size={7} className="opacity-80" />
+            <BirthdayBalloonsIcon size={16} className="transform rotate-3 drop-shadow-xs" />
+          </div>
+          <div className="flex items-center justify-center gap-1.5 text-[7px] font-mono uppercase tracking-[0.22em] font-semibold" style={{ color: '#d97706' }}>
+            <span>YOUR DAY • YOUR MOMENT</span>
+          </div>
+          <h3 className="font-serif text-[10px] font-bold tracking-[0.08em] uppercase mt-0.5 max-w-[176px] mx-auto" style={{ color: '#18181b' }}>
+            Celebrate every little moment
+          </h3>
+          <p className="text-[6.5px] font-mono tracking-wider opacity-85 mt-0.5" style={{ color: '#d97706' }}>
+            Good Times • Big Smiles • Great Memories
+          </p>
+        </div>
+      ) : isCorporateTheme ? (
+        <div className="w-full text-center pb-2 pt-0.5 border-b mb-2 relative" style={{ borderColor: 'rgba(37, 99, 235, 0.35)' }}>
+          <div className="absolute left-1.5 top-0.5 pointer-events-none flex items-center gap-1">
+            <BuildingSkyscraperIcon size={16} className="transform -rotate-6 drop-shadow-xs" />
+            <CorporateSparklesIcon variant="star" size={7} color="#2563eb" className="opacity-80" />
+          </div>
+          <div className="absolute right-1.5 top-0.5 pointer-events-none flex items-center gap-1">
+            <CorporateSparklesIcon variant="cross" size={7} color="#38bdf8" className="opacity-80" />
+            <TrophyCupIcon size={16} className="transform rotate-3 drop-shadow-xs" />
+          </div>
+          <div className="flex items-center justify-center gap-1.5 text-[7px] font-mono uppercase tracking-[0.22em] font-semibold" style={{ color: '#2563eb' }}>
+            <span>CORPORATE MOMENTS</span>
+          </div>
+          <h3 className="font-serif text-[9.5px] font-bold tracking-[0.06em] uppercase mt-0.5 max-w-[176px] mx-auto" style={{ color: '#0f172a' }}>
+            Built together. Achieved together
+          </h3>
+          <p className="text-[6.5px] font-mono tracking-wider opacity-85 mt-0.5" style={{ color: '#2563eb' }}>
+            Connect • Collaborate • Celebrate
+          </p>
+        </div>
+      ) : isGraduationTheme ? (
+        <div className="w-full text-center pb-2 pt-0.5 border-b mb-2 relative" style={{ borderColor: 'rgba(212, 175, 55, 0.4)' }}>
+          <div className="absolute left-1.5 top-0.5 pointer-events-none flex items-center gap-1">
+            <GraduationCapIcon size={16} className="transform -rotate-6 drop-shadow-xs" />
+            <GraduationSparklesIcon variant="star" size={7} color="#fde047" className="opacity-80" />
+          </div>
+          <div className="absolute right-1.5 top-0.5 pointer-events-none flex items-center gap-1">
+            <GraduationSparklesIcon variant="cross" size={7} color="#d4af37" className="opacity-80" />
+            <GraduationTrophyIcon size={16} className="transform rotate-3 drop-shadow-xs" />
+          </div>
+          <div className="flex items-center justify-center gap-1.5 text-[7px] font-mono uppercase tracking-[0.22em] font-semibold" style={{ color: '#d4af37' }}>
+            <span>GRADUATION CELEBRATION</span>
+          </div>
+          <h3 className="font-serif text-[10px] font-bold tracking-[0.08em] uppercase mt-0.5 max-w-[176px] mx-auto" style={{ color: '#fcf8ef' }}>
+            The Next Chapter
+          </h3>
+          <p className="text-[6.5px] font-mono tracking-wider opacity-85 mt-0.5" style={{ color: '#d4af37' }}>
+            One journey ends. Another begins
+          </p>
+        </div>
+      ) : isDebutTheme ? (
+        <div className="w-full text-center pb-2 pt-0.5 border-b mb-2 relative" style={{ borderColor: 'rgba(219, 39, 119, 0.4)' }}>
+          <div className="flex items-center justify-center gap-1.5 text-[7px] font-mono uppercase tracking-[0.22em] font-semibold" style={{ color: '#db2777' }}>
+            <span>DEBUTANTE CELEBRATION</span>
+          </div>
+          <h3 className="font-serif text-[10px] font-bold tracking-[0.1em] uppercase mt-0.5 max-w-[176px] mx-auto" style={{ color: '#831843' }}>
+            The Grand Eighteen
+          </h3>
+          <p className="text-[6.5px] font-mono tracking-wider opacity-85 mt-0.5" style={{ color: '#be185d' }}>
+            A Night of Elegance & Memories
+          </p>
+        </div>
+      ) : (
+        <div className="w-full text-center pb-2 pt-0.5 border-b mb-2" style={{ borderColor: isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)' }}>
+          <div className="flex items-center justify-center gap-1 text-[8px] font-mono uppercase tracking-[0.25em] opacity-80">
+            {matchedEventType ? (
+              <>
+                <span>{getEventEmoji(matchedEventType)}</span>
+                <span>{getEventBareLabel(matchedEventType).toUpperCase()}</span>
+                <span>{getEventEmoji(matchedEventType)}</span>
+              </>
+            ) : (
+              <>
+                <span>✦</span>
+                <span>MEMORA PHOTO STUDIO</span>
+                <span>✦</span>
+              </>
+            )}
+          </div>
+          <p className="font-display text-xs tracking-wide mt-0.5 truncate px-1" style={{ color: selectedTemplate.textColor }}>
+            {selectedTemplate.name}
+          </p>
+        </div>
+      )}
+
+      {/* Photo Slots Body */}
+      {layoutId === 'filmstrip' ? (
+        /* 35mm Analog Filmstrip with Sprocket Perforations */
+        <div className="w-full flex items-stretch gap-1.5 py-1">
+          {/* Left Sprockets */}
+          <div
+            className="flex flex-col justify-between py-1 px-1 rounded-xs shrink-0"
+            style={{
+              backgroundColor: isSchoolTheme ? (isSchoolLight ? 'rgba(133, 93, 16, 0.1)' : 'rgba(212, 175, 55, 0.12)') : isLight ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.6)',
+            }}
+          >
+            {[...Array(7)].map((_, i) => (
+              <div
+                key={i}
+                className="w-2 h-2.5 rounded-[2px] my-1 shrink-0"
+                style={{
+                  backgroundColor: isSchoolTheme ? schoolPalette.accentGold : isLight ? '#1c1917' : '#ffffff',
+                  border: isSchoolTheme ? '1px solid ' + schoolPalette.borderGold : isLight ? '1px solid rgba(0,0,0,0.2)' : '1px solid rgba(0,0,0,0.4)',
+                  opacity: isSchoolTheme ? 0.9 : 1,
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Center Slots */}
+          <div className="flex-1 space-y-1.5">
+            {photoSlots.map((_, pIdx) => (
+              <div
+                key={pIdx}
+                className="relative overflow-hidden aspect-[4/3] rounded-xs flex flex-col items-center justify-center border"
+                style={{
+                  backgroundColor: isSchoolTheme ? schoolPalette.slotBg : isLight ? 'rgba(0,0,0,0.08)' : '#090a0f',
+                  borderColor: isSchoolTheme ? schoolPalette.slotBorder : isLight ? 'rgba(0,0,0,0.15)' : '#000000',
+                }}
+              >
+                {shots[pIdx] ? (
+                  <div className="absolute inset-0 overflow-hidden rounded-xs z-0">
+                    <img
+                      src={shots[pIdx]}
+                      alt={`Photo ${pIdx + 1}`}
+                      className="w-full h-full object-cover"
+                      style={{ filter: activeFilter.css }}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    {isSchoolTheme && (
+                      <>
+                        <span className="absolute top-0.5 left-1 text-[7px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌜</span>
+                        <span className="absolute top-0.5 right-1 text-[7px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌝</span>
+                        <span className="absolute bottom-0.5 left-1 text-[7px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌞</span>
+                        <span className="absolute bottom-0.5 right-1 text-[7px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌟</span>
+                      </>
+                    )}
+                    <div className="flex flex-col items-center justify-center gap-1 p-2 text-center select-none opacity-80">
+                      <Camera className="w-3.5 h-3.5" style={{ color: isSchoolTheme ? schoolPalette.textSecondary : undefined }} />
+                      <span className="font-mono text-[7px] uppercase tracking-wider font-semibold" style={{ color: isSchoolTheme ? schoolPalette.textPrimary : undefined }}>
+                        Photo {pIdx + 1}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Right Sprockets */}
+          <div
+            className="flex flex-col justify-between py-1 px-1 rounded-xs shrink-0"
+            style={{
+              backgroundColor: isSchoolTheme ? (isSchoolLight ? 'rgba(133, 93, 16, 0.1)' : 'rgba(212, 175, 55, 0.12)') : isLight ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.6)',
+            }}
+          >
+            {[...Array(7)].map((_, i) => (
+              <div
+                key={i}
+                className="w-2 h-2.5 rounded-[2px] my-1 shrink-0"
+                style={{
+                  backgroundColor: isSchoolTheme ? schoolPalette.accentGold : isLight ? '#1c1917' : '#ffffff',
+                  border: isSchoolTheme ? '1px solid ' + schoolPalette.borderGold : isLight ? '1px solid rgba(0,0,0,0.2)' : '1px solid rgba(0,0,0,0.4)',
+                  opacity: isSchoolTheme ? 0.9 : 1,
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      ) : layoutId === 'grid2x2' ? (
+        /* 2x2 Quad Grid Collage */
+        <div className="w-full grid grid-cols-2 gap-1.5 py-1">
+          {photoSlots.map((_, pIdx) => (
+            <div
+              key={pIdx}
+              className="relative overflow-hidden aspect-[4/3] rounded-xs flex flex-col items-center justify-center border"
+              style={{
+                backgroundColor: isSchoolTheme ? schoolPalette.slotBg : isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)',
+                borderColor: isSchoolTheme ? schoolPalette.slotBorder : isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.12)',
+              }}
+            >
+              {shots[pIdx] ? (
+                <div className="absolute inset-0 overflow-hidden rounded-xs z-0">
+                  <img
+                    src={shots[pIdx]}
+                    alt={`Photo ${pIdx + 1}`}
+                    className="w-full h-full object-cover"
+                    style={{ filter: activeFilter.css }}
+                  />
+                </div>
+              ) : (
+                <>
+                  {isSchoolTheme && (
+                    <>
+                      <span className="absolute top-0.5 left-1 text-[6px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌜</span>
+                      <span className="absolute top-0.5 right-1 text-[6px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌝</span>
+                      <span className="absolute bottom-0.5 left-1 text-[6px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌞</span>
+                      <span className="absolute bottom-0.5 right-1 text-[6px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌟</span>
+                    </>
+                  )}
+                  <div className="flex flex-col items-center justify-center gap-0.5 p-1 select-none opacity-80">
+                    <Camera className="w-3 h-3" style={{ color: isSchoolTheme ? schoolPalette.textSecondary : undefined }} />
+                    <span className="font-mono text-[7px] uppercase tracking-wider font-semibold" style={{ color: isSchoolTheme ? schoolPalette.textPrimary : undefined }}>
+                      Photo {pIdx + 1}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : layoutId === 'grid2x3' ? (
+        /* 2x3 Hexa Grid Collage */
+        <div className="w-full grid grid-cols-2 gap-1.5 py-1">
+          {photoSlots.map((_, pIdx) => (
+            <div
+              key={pIdx}
+              className="relative overflow-hidden aspect-[4/3] rounded-xs flex flex-col items-center justify-center border"
+              style={{
+                backgroundColor: isSchoolTheme ? schoolPalette.slotBg : isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)',
+                borderColor: isSchoolTheme ? schoolPalette.slotBorder : isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.12)',
+              }}
+            >
+              {shots[pIdx] ? (
+                <div className="absolute inset-0 overflow-hidden rounded-xs z-0">
+                  <img
+                    src={shots[pIdx]}
+                    alt={`Photo ${pIdx + 1}`}
+                    className="w-full h-full object-cover"
+                    style={{ filter: activeFilter.css }}
+                  />
+                </div>
+              ) : (
+                <>
+                  {isSchoolTheme && (
+                    <>
+                      <span className="absolute top-0.5 left-1 text-[6px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌜</span>
+                      <span className="absolute top-0.5 right-1 text-[6px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌝</span>
+                      <span className="absolute bottom-0.5 left-1 text-[6px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌞</span>
+                      <span className="absolute bottom-0.5 right-1 text-[6px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌟</span>
+                    </>
+                  )}
+                  <div className="flex flex-col items-center justify-center gap-0.5 p-1 select-none opacity-80">
+                    <Camera className="w-3 h-3" style={{ color: isSchoolTheme ? schoolPalette.textSecondary : undefined }} />
+                    <span className="font-mono text-[7px] uppercase tracking-wider font-semibold" style={{ color: isSchoolTheme ? schoolPalette.textPrimary : undefined }}>
+                      Photo {pIdx + 1}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : layoutId === 'polaroid' ? (
+        /* Single Polaroid */
+        <div className="w-full py-1">
+          {photoSlots.map((_, pIdx) => (
+            <div
+              key={pIdx}
+              className="relative overflow-hidden aspect-[4/3] rounded-xs flex flex-col items-center justify-center border"
+              style={{
+                backgroundColor: isSchoolTheme ? schoolPalette.slotBg : isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)',
+                borderColor: isSchoolTheme ? schoolPalette.slotBorder : isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.12)',
+              }}
+            >
+              {shots[pIdx] ? (
+                <div className="absolute inset-0 overflow-hidden rounded-xs z-0">
+                  <img
+                    src={shots[pIdx]}
+                    alt="Single Instant Shot"
+                    className="w-full h-full object-cover"
+                    style={{ filter: activeFilter.css }}
+                  />
+                </div>
+              ) : (
+                <>
+                  {isSchoolTheme && (
+                    <>
+                      <span className="absolute top-1 left-1.5 text-[8px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌜</span>
+                      <span className="absolute top-1 right-1.5 text-[8px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌝</span>
+                      <span className="absolute bottom-1 left-1.5 text-[8px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌞</span>
+                      <span className="absolute bottom-1 right-1.5 text-[8px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌟</span>
+                    </>
+                  )}
+                  <div className="flex flex-col items-center justify-center gap-1 p-4 select-none opacity-80">
+                    <Camera className="w-5 h-5" style={{ color: isSchoolTheme ? schoolPalette.textSecondary : undefined }} />
+                    <span className="font-mono text-[8px] uppercase tracking-wider font-semibold" style={{ color: isSchoolTheme ? schoolPalette.textPrimary : undefined }}>
+                      {isSchoolTheme ? 'Campus Life Portrait' : 'Single Instant Shot'}
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+          <div className="h-6" />
+        </div>
+      ) : (
+        /* Vertical Strip: Duo, 3-strip, 4-strip */
+        <div className="w-full space-y-2 py-1 relative">
+          {/* MADE OF MEMORIES Divider (School Theme) */}
+          {isSchoolTheme && (
+            <div className="flex items-center justify-center gap-1.5 -mb-0.5">
+              <div className="h-px flex-1 opacity-60" style={{ backgroundColor: schoolPalette.borderGold }} />
+              <div
+                className="flex items-center justify-center px-2.5 py-0.5 rounded-full shadow-2xs border"
+                style={{
+                  backgroundColor: isSchoolLight ? '#ffffff' : '#0c182b',
+                  borderColor: schoolPalette.borderGold,
+                }}
+              >
+                <span className="text-[7px] font-mono tracking-widest uppercase font-bold" style={{ color: schoolPalette.textSecondary }}>
+                  MADE OF MEMORIES
+                </span>
+              </div>
+              <div className="h-px flex-1 opacity-60" style={{ backgroundColor: schoolPalette.borderGold }} />
+            </div>
+          )}
+
+          {photoSlots.map((_, pIdx) => (
+            <React.Fragment key={pIdx}>
+              <div
+                key={pIdx}
+                className="relative rounded-xs flex flex-col items-center justify-center border aspect-[4/3] transition-all"
+                style={{
+                  backgroundColor: isSchoolTheme
+                    ? schoolPalette.slotBg
+                    : isPartyTheme
+                    ? 'rgba(236, 72, 153, 0.08)'
+                    : isWeddingTheme
+                    ? 'rgba(184, 134, 11, 0.05)'
+                    : isBirthdayTheme
+                    ? 'rgba(217, 119, 6, 0.05)'
+                    : isLight
+                    ? 'rgba(0,0,0,0.05)'
+                    : 'rgba(255,255,255,0.05)',
+                  borderColor: isSchoolTheme
+                    ? schoolPalette.slotBorder
+                    : isPartyTheme
+                    ? 'rgba(236, 72, 153, 0.35)'
+                    : isWeddingTheme
+                    ? 'rgba(184, 134, 11, 0.25)'
+                    : isBirthdayTheme
+                    ? 'rgba(217, 119, 6, 0.25)'
+                    : isLight
+                    ? 'rgba(0,0,0,0.12)'
+                    : 'rgba(255,255,255,0.12)',
+                  boxShadow: isSchoolTheme
+                    ? '0 1px 3px rgba(0,0,0,0.08)'
+                    : isPartyTheme
+                    ? '0 0 10px rgba(236, 72, 153, 0.15)'
+                    : isWeddingTheme
+                    ? '0 0 10px rgba(184, 134, 11, 0.1)'
+                    : isBirthdayTheme
+                    ? '0 0 10px rgba(217, 119, 6, 0.08)'
+                    : undefined,
+                }}
+              >
+                {shots[pIdx] ? (
+                  <div className="absolute inset-0 overflow-hidden rounded-xs z-0">
+                    <img
+                      src={shots[pIdx]}
+                      alt={`Photo ${pIdx + 1}`}
+                      className="w-full h-full object-cover"
+                      style={{ filter: activeFilter.css }}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    {isSchoolTheme && (
+                      <>
+                        <span className="absolute top-0.5 left-1 text-[7px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌜</span>
+                        <span className="absolute top-0.5 right-1 text-[7px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌝</span>
+                        <span className="absolute bottom-0.5 left-1 text-[7px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌞</span>
+                        <span className="absolute bottom-0.5 right-1 text-[7px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌟</span>
+                      </>
+                    )}
+                    <div className="flex flex-col items-center justify-center gap-0.5 p-1 select-none opacity-85">
+                      <Camera className="w-3.5 h-3.5" style={{ color: isSchoolTheme ? schoolPalette.textSecondary : isPartyTheme ? '#ec4899' : isWeddingTheme ? '#b8860b' : isBirthdayTheme ? '#d97706' : undefined }} />
+                      <span className="font-mono text-[7px] uppercase tracking-wider font-semibold" style={{ color: isSchoolTheme ? schoolPalette.textPrimary : isPartyTheme ? '#f4f4f5' : isWeddingTheme ? '#1f1b18' : isBirthdayTheme ? '#18181b' : undefined }}>
+                        {isPartyTheme
+                          ? ['PRE-GAME', 'DANCE FLOOR', 'MIDNIGHT', 'VIP CREW'][pIdx % 4]
+                          : isWeddingTheme
+                          ? ['CEREMONY', 'COCKTAILS', 'FIRST DANCE', 'AFTER PARTY'][pIdx % 4]
+                          : isBirthdayTheme
+                          ? ['PARTY VIBES', 'MAKE A WISH', 'CAKE TIME', 'SQUAD'][pIdx % 4]
+                          : `Photo ${pIdx + 1}`}
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                {/* Sticker 1: Student ID Badge sticker on Right Edge of Photo 1 */}
+                {isSchoolTheme && pIdx === 0 && (
+                  <div className="absolute -right-3.5 -bottom-3.5 z-20 pointer-events-none transform rotate-[7deg] drop-shadow-md">
+                    <StudentIdBadgeIcon isLight={isSchoolLight} size={36} />
+                  </div>
+                )}
+
+                {/* Sticker 2: Vintage Book Stack sticker on Left Edge of Photo 2 */}
+                {isSchoolTheme && pIdx === 1 && (
+                  <div className="absolute -left-3.5 -bottom-3 z-20 pointer-events-none transform -rotate-[6deg] drop-shadow-md">
+                    <VintageBookStackIcon isLight={isSchoolLight} size={36} />
+                  </div>
+                )}
+
+                {/* Sticker 3: School Stationery sticker on Right Edge of Photo 3 */}
+                {isSchoolTheme && pIdx === 2 && (
+                  <div className="absolute -right-3.5 -bottom-3 z-20 pointer-events-none transform rotate-[7deg] drop-shadow-md">
+                    <SchoolStationeryIcon isLight={isSchoolLight} size={36} />
+                  </div>
+                )}
+
+                {/* Sticker 4: Student ID Badge sticker on Left Edge of Photo 4 if 4 poses */}
+                {isSchoolTheme && pIdx === 3 && (
+                  <div className="absolute -left-3.5 -bottom-3 z-20 pointer-events-none transform -rotate-[6deg] drop-shadow-md">
+                    <StudentIdBadgeIcon isLight={isSchoolLight} size={34} />
+                  </div>
+                )}
+
+                {/* Coastal Beach Theme Embellishments: shells, bubbles, plumeria, waves, starfish along margins */}
+                {isBeachTheme && (
+                  <BeachPhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
+                )}
+
+                {/* Nightclub & Party Theme Embellishments: disco ball, headphones, camera flash, vinyl, dancers, lightning, flame */}
+                {isPartyTheme && (
+                  <PartyPhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
+                )}
+
+                {/* Wedding Celebration Theme Embellishments: rings, bouquets, candles, leaves, hearts, sparkles */}
+                {isWeddingTheme && (
+                  <WeddingPhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
+                )}
+
+                {/* Birthday Celebration Theme Embellishments: 12 elements (cake, balloons, gift, popper, party face, sparkles, confetti, candles, cupcake, star, ribbon, glasses) */}
+                {isBirthdayTheme && (
+                  <BirthdayPhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
+                )}
+
+                {/* Corporate Theme Embellishments: 12 elements (briefcase, handshake, bar chart, target, trophy, lightbulb, team, growth arrow, building, achievement, microphone, sparkles) */}
+                {isCorporateTheme && (
+                  <CorporatePhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
+                )}
+
+                {/* Graduation Celebration Embellishments: 12 elements (cap, trophy, diploma, medal, stars, sparkles, books, confetti, badge, tassel, pen, celebration) */}
+                {isGraduationTheme && (
+                  <GraduationPhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
+                )}
+              </div>
+            </React.Fragment>
+          ))}
+        </div>
+      )}
+
+      {/* Caption if provided by user */}
+      {caption && caption.trim() && (
+        <div className="w-full text-center px-2 pt-1 pb-0.5">
+          <p className="text-[7.5px] font-mono tracking-wider italic truncate opacity-85">
+            {caption.trim()}
+          </p>
+        </div>
+      )}
+
+      {/* Bottom Footer Inscription */}
+      <div className="w-full pt-2 border-t text-center mt-1" style={{ borderColor: isSchoolTheme ? schoolPalette.borderGold : isPartyTheme ? 'rgba(236, 72, 153, 0.4)' : isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)' }}>
+        {isSchoolTheme ? (
+          <>
+            <div className="py-0.5 flex items-center justify-center">
+              <SchoolAcademicFooterIcon width={120} height={18} isLight={isSchoolLight} />
+            </div>
+            <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: schoolPalette.textSecondary }}>
+              <Logo className="w-2.5 h-2.5 shrink-0" />
+              <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
+                MEMORA
+              </span>
+            </div>
+          </>
+        ) : isBeachTheme ? (
+          <>
+            <div className="py-0.5 flex items-center justify-center">
+              <CoastalWaveFooterIcon width={120} height={16} />
+            </div>
+            <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#0284c7' }}>
+              <Logo className="w-2.5 h-2.5 shrink-0" />
+              <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
+                MEMORA
+              </span>
+            </div>
+          </>
+        ) : isPartyTheme ? (
+          <>
+            <div className="py-0.5 flex items-center justify-center">
+              <PartyEqualizerFooterIcon width={120} height={16} />
+            </div>
+            <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#ec4899' }}>
+              <Logo className="w-2.5 h-2.5 shrink-0" />
+              <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
+                MEMORA
+              </span>
+            </div>
+          </>
+        ) : isWeddingTheme ? (
+          <>
+            <div className="py-0.5 flex items-center justify-center">
+              <WeddingBotanicalFooterIcon width={120} height={18} />
+            </div>
+            <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#b8860b' }}>
+              <Logo className="w-2.5 h-2.5 shrink-0" />
+              <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
+                MEMORA
+              </span>
+            </div>
+          </>
+        ) : isBirthdayTheme ? (
+          <>
+            <div className="py-0.5 flex items-center justify-center">
+              <BirthdayBuntingFooterIcon width={120} height={18} />
+            </div>
+            <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#d97706' }}>
+              <Logo className="w-2.5 h-2.5 shrink-0" />
+              <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
+                MEMORA
+              </span>
+            </div>
+          </>
+        ) : isCorporateTheme ? (
+          <>
+            <div className="py-0.5 flex items-center justify-center">
+              <CorporateSkylineFooterIcon width={120} height={18} />
+            </div>
+            <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#2563eb' }}>
+              <Logo className="w-2.5 h-2.5 shrink-0" />
+              <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
+                MEMORA
+              </span>
+            </div>
+          </>
+        ) : isGraduationTheme ? (
+          <>
+            <div className="py-0.5 flex items-center justify-center">
+              <GraduationDiplomaFooterIcon width={120} height={18} />
+            </div>
+            <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#d4af37' }}>
+              <Logo className="w-2.5 h-2.5 shrink-0" />
+              <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
+                MEMORA
+              </span>
+            </div>
+          </>
+        ) : isDebutTheme ? (
+          <>
+            <div className="py-0.5 flex items-center justify-center">
+              <span className="text-[11px] tracking-widest text-pink-600 font-serif">✦ 👑 ✦</span>
+            </div>
+            <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#db2777' }}>
+              <Logo className="w-2.5 h-2.5 shrink-0" />
+              <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
+                MEMORA
+              </span>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="font-display text-[10px] tracking-wide flex items-center justify-center gap-1 uppercase" style={{ color: selectedTemplate.textColor }}>
+              <span>{selectedTemplate.badge || selectedTemplate.name}</span>
+            </p>
+            <p className="text-[8px] font-mono opacity-65 tracking-wider mt-0.5">
+              {activeLayout.shots} {activeLayout.shots === 1 ? 'Pose' : 'Poses'} • {activeLayout.label}
+            </p>
+            <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: selectedTemplate.textColor }}>
+              <Logo className="w-2.5 h-2.5 shrink-0" />
+              <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
+                MEMORA
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
 
   const errorMessage = errorKind ? ERROR_MESSAGES[errorKind] || ERROR_MESSAGES.unknown : null;
 
@@ -3606,7 +5050,7 @@ export function MemoraBooth({
     <div className="min-h-screen bg-foreground text-cream font-sans">
       <div
         className={`mx-auto flex min-h-screen w-full flex-col px-4 py-4 transition-all duration-300 ${
-          phase === 'intro' ? 'max-w-5xl' : 'max-w-[420px]'
+          phase === 'intro' ? 'max-w-5xl' : phase === 'shooting' ? 'max-w-[460px] sm:max-w-[500px]' : 'max-w-[420px]'
         }`}
       >
         {/* Header */}
@@ -3614,8 +5058,8 @@ export function MemoraBooth({
           <Link href={exitHref} className="flex items-center gap-2.5 group cursor-pointer">
             <Logo className="w-7 h-7 shrink-0 transition-transform duration-300 group-hover:scale-105" />
             <div>
-              <div className="font-display text-lg leading-none tracking-tight group-hover:text-primary transition-colors">{eventName.toUpperCase()}</div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-cream/60">{eventSubtitle}</div>
+              <div className="font-display text-lg leading-none tracking-tight group-hover:text-primary transition-colors" suppressHydrationWarning>{eventName.toUpperCase()}</div>
+              <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-cream/60" suppressHydrationWarning>{eventSubtitle}</div>
             </div>
           </Link>
           <Link
@@ -3641,45 +5085,98 @@ export function MemoraBooth({
                   </p>
                 </div>
 
-                {/* 1. PRO Event Template Selector */}
-                {activeProTemplate && (
+                {/* 1. PRO / Studio Pro Event Template Selector */}
+                {proEventTemplates.length > 0 && (
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-cream/50 flex items-center gap-1.5">
-                        <Sparkles className="w-3 h-3 text-primary" />
-                        <span>PRO Event Template</span>
+                      <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-cream/70 flex items-center gap-1.5 font-medium">
+                        <Sparkles className={`w-3 h-3 ${isStudioPlan ? 'text-amber-400' : 'text-primary'}`} />
+                        <span className="text-cream">{isStudioPlan ? 'Studio Pro Template' : 'PRO Event Template'}</span>
                       </p>
-                      <span className="font-mono text-[9px] text-cream/40 uppercase tracking-wider">
-                        PRO Pass
+                      <span className={`font-mono text-[9px] uppercase tracking-wider font-semibold ${isStudioPlan ? 'text-amber-400' : 'text-cream/40'}`}>
+                        {isStudioPlan ? 'Studio Pro' : 'PRO Pass'}
                       </span>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleSelectTemplate(activeProTemplate)}
-                      className={`w-full relative flex items-center gap-3 rounded-2xl p-2.5 text-left text-xs transition-all cursor-pointer ${
-                        templateId === activeProTemplate.id
-                          ? 'bg-cream/15 text-cream border border-cream/50 ring-2 ring-primary/50 shadow-md'
-                          : 'bg-cream/5 text-cream/70 border border-white/5 hover:bg-cream/10'
-                      }`}
-                      title={activeProTemplate.name}
-                    >
-                      <span
-                        className="w-3.5 h-3.5 rounded-full shrink-0 border border-white/20 shadow-xs"
-                        style={{ backgroundColor: activeProTemplate.frameColor }}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-xs truncate leading-snug">{activeProTemplate.name}</span>
-                          <span className="text-[10px] font-mono text-cream/45 truncate">
-                            • {activeProTemplate.layout}
-                          </span>
+                    {!isStudioPlan && activeProTemplate ? (
+                      <button
+                        type="button"
+                        onClick={() => handleSelectTemplate(activeProTemplate)}
+                        className={`w-full relative flex items-center gap-3 rounded-2xl p-2.5 text-left text-xs transition-all cursor-pointer ${
+                          templateId === activeProTemplate.id
+                            ? 'bg-cream/15 text-cream border border-cream/50 ring-2 ring-primary/50 shadow-md'
+                            : 'bg-cream/5 text-cream/70 border border-white/5 hover:bg-cream/10'
+                        }`}
+                        title={activeProTemplate.name}
+                      >
+                        <span
+                          className="w-3.5 h-3.5 rounded-full shrink-0 border border-white/20 shadow-xs"
+                          style={{ backgroundColor: activeProTemplate.frameColor }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-xs truncate leading-snug">{activeProTemplate.name}</span>
+                            <span className="text-[10px] font-mono text-cream/45 truncate">
+                              • {activeProTemplate.layout}
+                            </span>
+                          </div>
+                          <div className="text-[10px] font-mono text-cream/45 truncate">
+                            {activeProTemplate.description}
+                          </div>
                         </div>
-                        <div className="text-[10px] font-mono text-cream/45 truncate">
-                          {activeProTemplate.description}
+                      </button>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {visibleProEventTemplates.map((tpl) => {
+                            const isSelected = templateId === tpl.id;
+                            return (
+                              <button
+                                key={tpl.id}
+                                type="button"
+                                onClick={() => handleSelectTemplate(tpl)}
+                                className={`relative flex items-center gap-2.5 rounded-2xl p-2.5 text-left text-xs transition-all cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-cream/15 text-cream border border-cream/50 ring-2 ring-primary/50 shadow-md'
+                                    : 'bg-cream/5 text-cream/70 border border-white/5 hover:bg-cream/10'
+                                }`}
+                                title={tpl.name}
+                              >
+                                <span
+                                  className="w-3.5 h-3.5 rounded-full shrink-0 border border-white/20 shadow-xs"
+                                  style={{ backgroundColor: tpl.frameColor }}
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-medium text-xs truncate leading-snug">{tpl.name}</span>
+                                  </div>
+                                  <div className="text-[10px] font-mono text-cream/45 truncate">
+                                    {tpl.layout} • {tpl.description}
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
                         </div>
-                      </div>
-                    </button>
+
+                        {proEventTemplates.length > 4 && (
+                          <div className="flex justify-center mt-2.5">
+                            <button
+                              type="button"
+                              onClick={() => setShowAllStudioTemplates(!showAllStudioTemplates)}
+                              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-mono uppercase tracking-wider text-cream/70 hover:text-cream bg-cream/5 hover:bg-cream/10 border border-white/10 transition-all cursor-pointer shadow-xs active:scale-95"
+                            >
+                              <span>{showAllStudioTemplates ? 'Show less' : 'Show more'}</span>
+                              <ChevronDown
+                                className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                                  showAllStudioTemplates ? 'rotate-180' : ''
+                                }`}
+                              />
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -3776,29 +5273,6 @@ export function MemoraBooth({
                     })}
                   </div>
                 </div>
-
-                {/* Countdown Duration */}
-                <div>
-                  <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-cream/50 mb-2 flex items-center gap-1.5">
-                    <Timer className="w-3 h-3 text-primary" />
-                    <span>Countdown</span>
-                  </p>
-                  <div className="grid grid-cols-4 gap-2">
-                    {COUNTDOWNS.map((sec) => (
-                      <button
-                        key={sec}
-                        type="button"
-                        onClick={() => setCountdownDuration(sec)}
-                        className={`rounded-2xl px-2 py-3 text-xs font-semibold transition-colors cursor-pointer ${
-                          countdownDuration === sec ? 'bg-primary text-primary-foreground' : 'bg-cream/10 text-cream/70 hover:bg-cream/15'
-                        }`}
-                      >
-                        {sec === 0 ? 'Off' : `${sec}s`}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
                 {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
 
                 {/* Enable Camera Action */}
@@ -3833,796 +5307,13 @@ export function MemoraBooth({
 
                   {/* Summary Bar */}
                   <div className="w-full flex items-center justify-between px-3 py-1.5 rounded-xl bg-black/30 border border-white/5 text-[10px] font-mono text-cream/60 mb-3">
-                    <span className="truncate">{selectedTemplate.name}</span>
+                    <span className="truncate">{selectedTemplate.name.replace(/^Pro Event\s*[–—-]\s*/i, isStudioPlan ? 'Studio Pro – ' : 'Pro Event – ')}</span>
                     <span className="text-primary font-medium shrink-0 ml-2">{activeLayout.label}</span>
                   </div>
 
                   {/* Photobooth Strip Canvas Container */}
                   <div className="w-full flex justify-center py-1">
-                    <div
-                      className="w-60 max-w-full rounded-xl transition-all duration-300 shadow-2xl relative p-3.5 flex flex-col items-center justify-between overflow-visible"
-                      style={{
-                        backgroundColor: isSchoolTheme
-                          ? schoolPalette.bg
-                          : isPartyTheme
-                          ? '#0f1117'
-                          : isWeddingTheme
-                          ? '#fcf8f4'
-                          : isBirthdayTheme
-                          ? '#fffdf9'
-                          : isCorporateTheme
-                          ? '#f8fafc'
-                          : isGraduationTheme
-                          ? '#0a1128'
-                          : selectedTemplate.frameColor,
-                        color: isSchoolTheme
-                          ? schoolPalette.textPrimary
-                          : isPartyTheme
-                          ? '#f4f4f5'
-                          : isWeddingTheme
-                          ? '#1f1b18'
-                          : isBirthdayTheme
-                          ? '#18181b'
-                          : isCorporateTheme
-                          ? '#0f172a'
-                          : isGraduationTheme
-                          ? '#fcf8ef'
-                          : selectedTemplate.textColor,
-                        border: isSchoolTheme
-                          ? schoolPalette.outerBorder
-                          : isPartyTheme
-                          ? '2px solid rgba(236, 72, 153, 0.65)'
-                          : isWeddingTheme
-                          ? '2px solid rgba(184, 134, 11, 0.45)'
-                          : isBirthdayTheme
-                          ? '2px solid rgba(245, 158, 11, 0.5)'
-                          : isCorporateTheme
-                          ? '2px solid rgba(37, 99, 235, 0.45)'
-                          : isGraduationTheme
-                          ? '2px solid rgba(212, 175, 55, 0.65)'
-                          : `1px solid ${isLight ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.18)'}`,
-                        boxShadow: isSchoolTheme
-                          ? schoolPalette.outerShadow
-                          : isPartyTheme
-                          ? '0 0 25px rgba(236, 72, 153, 0.25), 0 0 0 1px rgba(236, 72, 153, 0.3)'
-                          : isWeddingTheme
-                          ? '0 0 20px rgba(184, 134, 11, 0.12), 0 0 0 1px rgba(184, 134, 11, 0.2)'
-                          : isBirthdayTheme
-                          ? '0 0 22px rgba(245, 158, 11, 0.16), 0 0 0 1px rgba(245, 158, 11, 0.25)'
-                          : isCorporateTheme
-                          ? '0 0 22px rgba(37, 99, 235, 0.14), 0 0 0 1px rgba(37, 99, 235, 0.25)'
-                          : isGraduationTheme
-                          ? '0 0 24px rgba(212, 175, 55, 0.2), 0 0 0 1px rgba(212, 175, 55, 0.3)'
-                          : undefined,
-                      }}
-                    >
-                      {/* Top Header Inscription */}
-                      {isSchoolTheme ? (
-                        <div className="w-full text-center pb-2 pt-0.5 border-b mb-2" style={{ borderColor: schoolPalette.borderGold }}>
-                          <div className="flex items-center justify-center gap-1.5 text-[7.5px] font-mono uppercase tracking-[0.25em]" style={{ color: schoolPalette.textSecondary }}>
-                            <span>★</span>
-                            <span>GOOD DAYS • GREAT MEMORIES</span>
-                            <span>★</span>
-                          </div>
-                          <h3 className="font-serif text-xs font-bold tracking-wider uppercase mt-1" style={{ color: schoolPalette.textPrimary }}>
-                            OUR SCHOOL ERA
-                          </h3>
-                          <div className="flex items-center justify-center gap-1.5 mt-1 opacity-90">
-                            <span className="h-px w-4" style={{ backgroundColor: schoolPalette.borderGold }} />
-                            <span className="text-[7px] font-mono tracking-widest uppercase font-semibold" style={{ color: schoolPalette.textSecondary }}>
-                              SCHOOL YEAR 2026–2027
-                            </span>
-                            <span className="h-px w-4" style={{ backgroundColor: schoolPalette.borderGold }} />
-                          </div>
-                        </div>
-                      ) : isBeachTheme ? (
-                        <div className="w-full text-center pb-2 pt-0.5 border-b mb-2" style={{ borderColor: 'rgba(2, 132, 199, 0.35)' }}>
-                          <div className="flex items-center justify-center gap-1.5 text-[7.5px] font-mono uppercase tracking-[0.2em]" style={{ color: '#0284c7' }}>
-                            <span>🌴</span>
-                            <span>LET THE GOOD TIMES ROLL</span>
-                            <span>🌴</span>
-                          </div>
-                          <h3 className="font-serif text-xs font-bold tracking-wider uppercase mt-0.5" style={{ color: '#0f172a' }}>
-                            GOOD VIBES, GREAT TIMES
-                          </h3>
-                          <p className="text-[7px] font-mono tracking-wider opacity-85 mt-0.5" style={{ color: '#0284c7' }}>
-                            Sun • Sand • Sea • Memories
-                          </p>
-                        </div>
-                      ) : isPartyTheme ? (
-                        <div className="w-full text-center pb-2 pt-0.5 border-b mb-2 relative" style={{ borderColor: 'rgba(236, 72, 153, 0.5)' }}>
-                          <div className="absolute left-1.5 top-0 pointer-events-none transform -rotate-6 drop-shadow-xs">
-                            <DiscoBallIcon size={18} />
-                          </div>
-                          <div className="absolute left-7 -top-1 pointer-events-none transform rotate-12">
-                            <PartySparklesIcon variant="star" size={9} />
-                          </div>
-                          <div className="absolute right-12 -top-1 pointer-events-none transform -rotate-12">
-                            <PartySparklesIcon variant="cross" size={9} />
-                          </div>
-                          <div className="absolute right-6.5 top-0 pointer-events-none transform -rotate-6 drop-shadow-xs">
-                            <GlossyBalloonsIcon size={16} />
-                          </div>
-                          <div className="absolute right-1 top-0 pointer-events-none transform rotate-6 drop-shadow-xs">
-                            <PartyPopperIcon size={18} />
-                          </div>
-                          <div className="flex items-center justify-center gap-1.5 text-[7.5px] font-mono uppercase tracking-[0.2em]" style={{ color: '#ec4899' }}>
-                            <span>PARTY NIGHT</span>
-                          </div>
-                          <h3 className="font-serif text-xs font-bold tracking-wider uppercase mt-0.5" style={{ color: '#f4f4f5' }}>
-                            GOOD FRIENDS. GREAT NIGHT
-                          </h3>
-                          <p className="text-[7px] font-mono tracking-wider opacity-85 mt-0.5" style={{ color: '#ec4899' }}>
-                            Dance • Laugh • Celebrate • Repeat
-                          </p>
-                        </div>
-                      ) : isWeddingTheme ? (
-                        <div className="w-full text-center pb-2 pt-0.5 border-b mb-2 relative" style={{ borderColor: 'rgba(184, 134, 11, 0.35)' }}>
-                          <div className="absolute left-1.5 top-0.5 pointer-events-none flex items-center gap-1">
-                            <WeddingRingsIcon size={18} className="transform -rotate-6 drop-shadow-xs" />
-                            <WeddingSparklesIcon variant="star" size={8} className="opacity-80" />
-                          </div>
-                          <div className="absolute right-1.5 top-0.5 pointer-events-none flex items-center gap-1">
-                            <WeddingHeartIcon size={14} className="transform rotate-6 drop-shadow-xs" />
-                            <WeddingBouquetIcon size={18} className="transform rotate-6 drop-shadow-xs" />
-                          </div>
-                          <div className="flex items-center justify-center gap-1.5 text-[7px] font-mono uppercase tracking-[0.22em] font-semibold" style={{ color: '#b8860b' }}>
-                            <span>WEDDING CELEBRATION</span>
-                          </div>
-                          <h3 className="font-serif text-xs font-bold tracking-[0.2em] uppercase mt-0.5" style={{ color: '#1f1b18' }}>
-                            FOREVER BEGINS
-                          </h3>
-                          <p className="text-[7px] font-mono tracking-wider opacity-85 mt-0.5 italic" style={{ color: '#855d10' }}>
-                            Two hearts • One beautiful journey
-                          </p>
-                        </div>
-                      ) : isBirthdayTheme ? (
-                        <div className="w-full text-center pb-2 pt-0.5 border-b mb-2 relative" style={{ borderColor: 'rgba(245, 158, 11, 0.4)' }}>
-                          <div className="absolute left-1.5 top-0.5 pointer-events-none flex items-center gap-1">
-                            <BirthdayCakeIcon size={16} className="transform -rotate-6 drop-shadow-xs" />
-                            <BirthdaySparklesIcon variant="star" size={7} className="opacity-80" />
-                          </div>
-                          <div className="absolute right-1.5 top-0.5 pointer-events-none flex items-center gap-1">
-                            <BirthdaySparklesIcon variant="cross" size={7} className="opacity-80" />
-                            <BirthdayBalloonsIcon size={16} className="transform rotate-3 drop-shadow-xs" />
-                          </div>
-                          <div className="flex items-center justify-center gap-1.5 text-[7px] font-mono uppercase tracking-[0.22em] font-semibold" style={{ color: '#d97706' }}>
-                            <span>YOUR DAY • YOUR MOMENT</span>
-                          </div>
-                          <h3 className="font-serif text-[10px] font-bold tracking-[0.08em] uppercase mt-0.5 max-w-[176px] mx-auto" style={{ color: '#18181b' }}>
-                            Celebrate every little moment
-                          </h3>
-                          <p className="text-[6.5px] font-mono tracking-wider opacity-85 mt-0.5" style={{ color: '#d97706' }}>
-                            Good Times • Big Smiles • Great Memories
-                          </p>
-                        </div>
-                      ) : isCorporateTheme ? (
-                        <div className="w-full text-center pb-2 pt-0.5 border-b mb-2 relative" style={{ borderColor: 'rgba(37, 99, 235, 0.35)' }}>
-                          <div className="absolute left-1.5 top-0.5 pointer-events-none flex items-center gap-1">
-                            <BuildingSkyscraperIcon size={16} className="transform -rotate-6 drop-shadow-xs" />
-                            <CorporateSparklesIcon variant="star" size={7} color="#2563eb" className="opacity-80" />
-                          </div>
-                          <div className="absolute right-1.5 top-0.5 pointer-events-none flex items-center gap-1">
-                            <CorporateSparklesIcon variant="cross" size={7} color="#38bdf8" className="opacity-80" />
-                            <TrophyCupIcon size={16} className="transform rotate-3 drop-shadow-xs" />
-                          </div>
-                          <div className="flex items-center justify-center gap-1.5 text-[7px] font-mono uppercase tracking-[0.22em] font-semibold" style={{ color: '#2563eb' }}>
-                            <span>CORPORATE MOMENTS</span>
-                          </div>
-                          <h3 className="font-serif text-[9.5px] font-bold tracking-[0.06em] uppercase mt-0.5 max-w-[176px] mx-auto" style={{ color: '#0f172a' }}>
-                            Built together. Achieved together
-                          </h3>
-                          <p className="text-[6.5px] font-mono tracking-wider opacity-85 mt-0.5" style={{ color: '#2563eb' }}>
-                            Connect • Collaborate • Celebrate
-                          </p>
-                        </div>
-                      ) : isGraduationTheme ? (
-                        <div className="w-full text-center pb-2 pt-0.5 border-b mb-2 relative" style={{ borderColor: 'rgba(212, 175, 55, 0.4)' }}>
-                          <div className="absolute left-1.5 top-0.5 pointer-events-none flex items-center gap-1">
-                            <GraduationCapIcon size={16} className="transform -rotate-6 drop-shadow-xs" />
-                            <GraduationSparklesIcon variant="star" size={7} color="#fde047" className="opacity-80" />
-                          </div>
-                          <div className="absolute right-1.5 top-0.5 pointer-events-none flex items-center gap-1">
-                            <GraduationSparklesIcon variant="cross" size={7} color="#d4af37" className="opacity-80" />
-                            <GraduationTrophyIcon size={16} className="transform rotate-3 drop-shadow-xs" />
-                          </div>
-                          <div className="flex items-center justify-center gap-1.5 text-[7px] font-mono uppercase tracking-[0.22em] font-semibold" style={{ color: '#d4af37' }}>
-                            <span>GRADUATION CELEBRATION</span>
-                          </div>
-                          <h3 className="font-serif text-[10px] font-bold tracking-[0.08em] uppercase mt-0.5 max-w-[176px] mx-auto" style={{ color: '#fcf8ef' }}>
-                            The Next Chapter
-                          </h3>
-                          <p className="text-[6.5px] font-mono tracking-wider opacity-85 mt-0.5" style={{ color: '#d4af37' }}>
-                            One journey ends. Another begins
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="w-full text-center pb-2 pt-0.5 border-b mb-2" style={{ borderColor: isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)' }}>
-                          <div className="flex items-center justify-center gap-1 text-[8px] font-mono uppercase tracking-[0.25em] opacity-80">
-                            {matchedEventType ? (
-                              <>
-                                <span>{getEventEmoji(matchedEventType)}</span>
-                                <span>{getEventBareLabel(matchedEventType).toUpperCase()}</span>
-                                <span>{getEventEmoji(matchedEventType)}</span>
-                              </>
-                            ) : (
-                              <>
-                                <span>✦</span>
-                                <span>MEMORA PHOTO STUDIO</span>
-                                <span>✦</span>
-                              </>
-                            )}
-                          </div>
-                          <p className="font-display text-xs tracking-wide mt-0.5 truncate px-1" style={{ color: selectedTemplate.textColor }}>
-                            {selectedTemplate.name}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Photo Slots Body */}
-                      {layoutId === 'filmstrip' ? (
-                        /* 35mm Analog Filmstrip with Sprocket Perforations */
-                        <div className="w-full flex items-stretch gap-1.5 py-1">
-                          {/* Left Sprockets */}
-                          <div
-                            className="flex flex-col justify-between py-1 px-1 rounded-xs shrink-0"
-                            style={{
-                              backgroundColor: isSchoolTheme ? (isSchoolLight ? 'rgba(133, 93, 16, 0.1)' : 'rgba(212, 175, 55, 0.12)') : isLight ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.6)',
-                            }}
-                          >
-                            {[...Array(7)].map((_, i) => (
-                              <div
-                                key={i}
-                                className="w-2 h-2.5 rounded-[2px] my-1 shrink-0"
-                                style={{
-                                  backgroundColor: isSchoolTheme ? schoolPalette.accentGold : isLight ? '#1c1917' : '#ffffff',
-                                  border: isSchoolTheme ? '1px solid ' + schoolPalette.borderGold : isLight ? '1px solid rgba(0,0,0,0.2)' : '1px solid rgba(0,0,0,0.4)',
-                                  opacity: isSchoolTheme ? 0.9 : 1,
-                                }}
-                              />
-                            ))}
-                          </div>
-
-                          {/* Center Slots */}
-                          <div className="flex-1 space-y-1.5">
-                            {photoSlots.map((_, pIdx) => (
-                              <div
-                                key={pIdx}
-                                className="relative overflow-hidden aspect-[4/3] rounded-xs flex flex-col items-center justify-center border"
-                                style={{
-                                  backgroundColor: isSchoolTheme ? schoolPalette.slotBg : isLight ? 'rgba(0,0,0,0.08)' : '#090a0f',
-                                  borderColor: isSchoolTheme ? schoolPalette.slotBorder : isLight ? 'rgba(0,0,0,0.15)' : '#000000',
-                                }}
-                              >
-                                {isSchoolTheme && (
-                                  <>
-                                    <span className="absolute top-0.5 left-1 text-[7px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌜</span>
-                                    <span className="absolute top-0.5 right-1 text-[7px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌝</span>
-                                    <span className="absolute bottom-0.5 left-1 text-[7px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌞</span>
-                                    <span className="absolute bottom-0.5 right-1 text-[7px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌟</span>
-                                  </>
-                                )}
-                                <div className="flex flex-col items-center justify-center gap-1 p-2 text-center select-none opacity-80">
-                                  <Camera className="w-3.5 h-3.5" style={{ color: isSchoolTheme ? schoolPalette.textSecondary : undefined }} />
-                                  <span className="font-mono text-[7px] uppercase tracking-wider font-semibold" style={{ color: isSchoolTheme ? schoolPalette.textPrimary : undefined }}>
-                                    {isSchoolTheme
-                                      ? `Photo ${pIdx + 1}`
-                                      : `Photo ${pIdx + 1}`}
-                                  </span>
-                                </div>
-                                {!isSchoolTheme && (
-                                  <span
-                                    className="absolute bottom-0.5 right-0.5 text-[5px] font-mono px-1 rounded font-semibold"
-                                    style={{
-                                      backgroundColor: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.1)',
-                                      color: selectedTemplate.textColor,
-                                    }}
-                                  >
-                                    {`0${pIdx + 1}A`}
-                                  </span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-
-                          {/* Right Sprockets */}
-                          <div
-                            className="flex flex-col justify-between py-1 px-1 rounded-xs shrink-0"
-                            style={{
-                              backgroundColor: isSchoolTheme ? (isSchoolLight ? 'rgba(133, 93, 16, 0.1)' : 'rgba(212, 175, 55, 0.12)') : isLight ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.6)',
-                            }}
-                          >
-                            {[...Array(7)].map((_, i) => (
-                              <div
-                                key={i}
-                                className="w-2 h-2.5 rounded-[2px] my-1 shrink-0"
-                                style={{
-                                  backgroundColor: isSchoolTheme ? schoolPalette.accentGold : isLight ? '#1c1917' : '#ffffff',
-                                  border: isSchoolTheme ? '1px solid ' + schoolPalette.borderGold : isLight ? '1px solid rgba(0,0,0,0.2)' : '1px solid rgba(0,0,0,0.4)',
-                                  opacity: isSchoolTheme ? 0.9 : 1,
-                                }}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      ) : layoutId === 'grid2x2' ? (
-                        /* 2x2 Quad Grid Collage */
-                        <div className="w-full grid grid-cols-2 gap-1.5 py-1">
-                          {photoSlots.map((_, pIdx) => (
-                            <div
-                              key={pIdx}
-                              className="relative overflow-hidden aspect-[4/3] rounded-xs flex flex-col items-center justify-center border"
-                              style={{
-                                backgroundColor: isSchoolTheme ? schoolPalette.slotBg : isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)',
-                                borderColor: isSchoolTheme ? schoolPalette.slotBorder : isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.12)',
-                              }}
-                            >
-                              {isSchoolTheme && (
-                                <>
-                                  <span className="absolute top-0.5 left-1 text-[6px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌜</span>
-                                  <span className="absolute top-0.5 right-1 text-[6px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌝</span>
-                                  <span className="absolute bottom-0.5 left-1 text-[6px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌞</span>
-                                  <span className="absolute bottom-0.5 right-1 text-[6px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌟</span>
-                                </>
-                              )}
-                              <div className="flex flex-col items-center justify-center gap-0.5 p-1 select-none opacity-80">
-                                <Camera className="w-3 h-3" style={{ color: isSchoolTheme ? schoolPalette.textSecondary : undefined }} />
-                                <span className="font-mono text-[7px] uppercase tracking-wider font-semibold" style={{ color: isSchoolTheme ? schoolPalette.textPrimary : undefined }}>
-                                  {`Photo ${pIdx + 1}`}
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : layoutId === 'grid2x3' ? (
-                        /* 2x3 Hexa Grid Collage */
-                        <div className="w-full grid grid-cols-2 gap-1.5 py-1">
-                          {photoSlots.map((_, pIdx) => (
-                            <div
-                              key={pIdx}
-                              className="relative overflow-hidden aspect-[4/3] rounded-xs flex flex-col items-center justify-center border"
-                              style={{
-                                backgroundColor: isSchoolTheme ? schoolPalette.slotBg : isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)',
-                                borderColor: isSchoolTheme ? schoolPalette.slotBorder : isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.12)',
-                              }}
-                            >
-                              {isSchoolTheme && (
-                                <>
-                                  <span className="absolute top-0.5 left-1 text-[6px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌜</span>
-                                  <span className="absolute top-0.5 right-1 text-[6px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌝</span>
-                                  <span className="absolute bottom-0.5 left-1 text-[6px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌞</span>
-                                  <span className="absolute bottom-0.5 right-1 text-[6px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌟</span>
-                                </>
-                              )}
-                              <div className="flex flex-col items-center justify-center gap-0.5 p-1 select-none opacity-80">
-                                <Camera className="w-3 h-3" style={{ color: isSchoolTheme ? schoolPalette.textSecondary : undefined }} />
-                                <span className="font-mono text-[7px] uppercase tracking-wider font-semibold" style={{ color: isSchoolTheme ? schoolPalette.textPrimary : undefined }}>
-                                  {`Photo ${pIdx + 1}`}
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : layoutId === 'polaroid' ? (
-                        /* Single Polaroid */
-                        <div className="w-full py-1">
-                          {photoSlots.map((_, pIdx) => (
-                            <div
-                              key={pIdx}
-                              className="relative overflow-hidden aspect-[4/3] rounded-xs flex flex-col items-center justify-center border"
-                              style={{
-                                backgroundColor: isSchoolTheme ? schoolPalette.slotBg : isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)',
-                                borderColor: isSchoolTheme ? schoolPalette.slotBorder : isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.12)',
-                              }}
-                            >
-                              {isSchoolTheme && (
-                                <>
-                                  <span className="absolute top-1 left-1.5 text-[8px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌜</span>
-                                  <span className="absolute top-1 right-1.5 text-[8px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌝</span>
-                                  <span className="absolute bottom-1 left-1.5 text-[8px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌞</span>
-                                  <span className="absolute bottom-1 right-1.5 text-[8px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌟</span>
-                                </>
-                              )}
-                              <div className="flex flex-col items-center justify-center gap-1 p-4 select-none opacity-80">
-                                <Camera className="w-5 h-5" style={{ color: isSchoolTheme ? schoolPalette.textSecondary : undefined }} />
-                                <span className="font-mono text-[8px] uppercase tracking-wider font-semibold" style={{ color: isSchoolTheme ? schoolPalette.textPrimary : undefined }}>
-                                  {isSchoolTheme ? 'Campus Life Portrait' : 'Single Instant Shot'}
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                          <div className="h-6" />
-                        </div>
-                      ) : (
-                        /* Vertical Strip: Duo, 3-strip, 4-strip */
-                        <div className="w-full space-y-2 py-1 relative">
-                          {/* MADE OF MEMORIES Divider (School Theme) */}
-                          {isSchoolTheme && (
-                            <div className="flex items-center justify-center gap-1.5 -mb-0.5">
-                              <div className="h-px flex-1 opacity-60" style={{ backgroundColor: schoolPalette.borderGold }} />
-                              <div
-                                className="flex items-center justify-center px-2.5 py-0.5 rounded-full shadow-2xs border"
-                                style={{
-                                  backgroundColor: isSchoolLight ? '#ffffff' : '#0c182b',
-                                  borderColor: schoolPalette.borderGold,
-                                }}
-                              >
-                                <span className="text-[7px] font-mono tracking-widest uppercase font-bold" style={{ color: schoolPalette.textSecondary }}>
-                                  MADE OF MEMORIES
-                                </span>
-                              </div>
-                              <div className="h-px flex-1 opacity-60" style={{ backgroundColor: schoolPalette.borderGold }} />
-                            </div>
-                          )}
-
-                          {photoSlots.map((_, pIdx) => (
-                            <React.Fragment key={pIdx}>
-                              <div
-                                key={pIdx}
-                                className="relative rounded-xs flex flex-col items-center justify-center border aspect-[4/3] transition-all"
-                                style={{
-                                  backgroundColor: isSchoolTheme
-                                    ? schoolPalette.slotBg
-                                    : isPartyTheme
-                                    ? 'rgba(236, 72, 153, 0.08)'
-                                    : isWeddingTheme
-                                    ? 'rgba(184, 134, 11, 0.05)'
-                                    : isBirthdayTheme
-                                    ? 'rgba(217, 119, 6, 0.05)'
-                                    : isLight
-                                    ? 'rgba(0,0,0,0.05)'
-                                    : 'rgba(255,255,255,0.05)',
-                                  borderColor: isSchoolTheme
-                                    ? schoolPalette.slotBorder
-                                    : isPartyTheme
-                                    ? 'rgba(236, 72, 153, 0.35)'
-                                    : isWeddingTheme
-                                    ? 'rgba(184, 134, 11, 0.25)'
-                                    : isBirthdayTheme
-                                    ? 'rgba(217, 119, 6, 0.25)'
-                                    : isLight
-                                    ? 'rgba(0,0,0,0.12)'
-                                    : 'rgba(255,255,255,0.12)',
-                                  boxShadow: isSchoolTheme
-                                    ? '0 1px 3px rgba(0,0,0,0.08)'
-                                    : isPartyTheme
-                                    ? '0 0 10px rgba(236, 72, 153, 0.15)'
-                                    : isWeddingTheme
-                                    ? '0 0 10px rgba(184, 134, 11, 0.1)'
-                                    : isBirthdayTheme
-                                    ? '0 0 10px rgba(217, 119, 6, 0.08)'
-                                    : undefined,
-                                }}
-                              >
-                                {isSchoolTheme && (
-                                  <>
-                                    <span className="absolute top-0.5 left-1 text-[7px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌜</span>
-                                    <span className="absolute top-0.5 right-1 text-[7px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌝</span>
-                                    <span className="absolute bottom-0.5 left-1 text-[7px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌞</span>
-                                    <span className="absolute bottom-0.5 right-1 text-[7px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌟</span>
-                                  </>
-                                )}
-                                <div className="flex flex-col items-center justify-center gap-0.5 p-1 select-none opacity-85">
-                                  <Camera className="w-3.5 h-3.5" style={{ color: isSchoolTheme ? schoolPalette.textSecondary : isPartyTheme ? '#ec4899' : isWeddingTheme ? '#b8860b' : isBirthdayTheme ? '#d97706' : undefined }} />
-                                  <span className="font-mono text-[7px] uppercase tracking-wider font-semibold" style={{ color: isSchoolTheme ? schoolPalette.textPrimary : isPartyTheme ? '#f4f4f5' : isWeddingTheme ? '#1f1b18' : isBirthdayTheme ? '#18181b' : undefined }}>
-                                    {isPartyTheme
-                                      ? ['PRE-GAME', 'DANCE FLOOR', 'MIDNIGHT', 'VIP CREW'][pIdx % 4]
-                                      : isWeddingTheme
-                                      ? ['CEREMONY', 'COCKTAILS', 'FIRST DANCE', 'AFTER PARTY'][pIdx % 4]
-                                      : isBirthdayTheme
-                                      ? ['PARTY VIBES', 'MAKE A WISH', 'CAKE TIME', 'SQUAD'][pIdx % 4]
-                                      : `Photo ${pIdx + 1}`}
-                                  </span>
-                                </div>
-
-                                {/* Sticker 1: Student ID Badge sticker on Right Edge of Photo 1 */}
-                                {isSchoolTheme && pIdx === 0 && (
-                                  <div className="absolute -right-3.5 -bottom-3.5 z-20 pointer-events-none transform rotate-[7deg] drop-shadow-md">
-                                    <StudentIdBadgeIcon isLight={isSchoolLight} size={36} />
-                                  </div>
-                                )}
-
-                                {/* Sticker 2: Vintage Book Stack sticker on Left Edge of Photo 2 */}
-                                {isSchoolTheme && pIdx === 1 && (
-                                  <div className="absolute -left-3.5 -bottom-3 z-20 pointer-events-none transform -rotate-[6deg] drop-shadow-md">
-                                    <VintageBookStackIcon isLight={isSchoolLight} size={36} />
-                                  </div>
-                                )}
-
-                                {/* Sticker 3: School Stationery sticker on Right Edge of Photo 3 */}
-                                {isSchoolTheme && pIdx === 2 && (
-                                  <div className="absolute -right-3.5 -bottom-3 z-20 pointer-events-none transform rotate-[7deg] drop-shadow-md">
-                                    <SchoolStationeryIcon isLight={isSchoolLight} size={36} />
-                                  </div>
-                                )}
-
-                                {/* Coastal Beach Theme Embellishments: shells, bubbles, plumeria, waves, starfish along margins */}
-                                {isBeachTheme && (
-                                  <BeachPhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
-                                )}
-
-                                {/* Nightclub & Party Theme Embellishments: disco ball, headphones, camera flash, vinyl, dancers, lightning, flame */}
-                                {isPartyTheme && (
-                                  <PartyPhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
-                                )}
-
-                                {/* Wedding Celebration Theme Embellishments: rings, bouquets, candles, leaves, hearts, sparkles */}
-                                {isWeddingTheme && (
-                                  <WeddingPhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
-                                )}
-
-                                {/* Birthday Celebration Theme Embellishments: 12 elements (cake, balloons, gift, popper, party face, sparkles, confetti, candles, cupcake, star, ribbon, glasses) */}
-                                {isBirthdayTheme && (
-                                  <BirthdayPhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
-                                )}
-
-                                {/* Corporate Theme Embellishments: 12 elements (briefcase, handshake, bar chart, target, trophy, lightbulb, team, growth arrow, building, achievement, microphone, sparkles) */}
-                                {isCorporateTheme && (
-                                  <CorporatePhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
-                                )}
-
-                                {/* Graduation Celebration Embellishments: 12 elements (cap, trophy, diploma, medal, stars, sparkles, books, confetti, badge, tassel, pen, celebration) */}
-                                {isGraduationTheme && (
-                                  <GraduationPhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
-                                )}
-
-                                {/* Frame Numbering */}
-                                {!isSchoolTheme && (
-                                  <span
-                                    className="absolute bottom-0.5 right-1 text-[5.5px] font-mono px-1 py-0.2 rounded font-semibold"
-                                    style={{
-                                      backgroundColor: isPartyTheme
-                                        ? 'rgba(236, 72, 153, 0.18)'
-                                        : isWeddingTheme
-                                        ? 'rgba(184, 134, 11, 0.15)'
-                                        : isBirthdayTheme
-                                        ? 'rgba(217, 119, 6, 0.15)'
-                                        : isCorporateTheme
-                                        ? 'rgba(37, 99, 235, 0.15)'
-                                        : isGraduationTheme
-                                        ? 'rgba(212, 175, 55, 0.18)'
-                                        : isLight
-                                        ? 'rgba(0,0,0,0.06)'
-                                        : 'rgba(255,255,255,0.1)',
-                                      color: isPartyTheme
-                                        ? '#ec4899'
-                                        : isWeddingTheme
-                                        ? '#b8860b'
-                                        : isBirthdayTheme
-                                        ? '#d97706'
-                                        : isCorporateTheme
-                                        ? '#2563eb'
-                                        : isGraduationTheme
-                                        ? '#d4af37'
-                                        : selectedTemplate.textColor,
-                                    }}
-                                  >
-                                    {isPartyTheme ? `PAR-0${pIdx + 1}` : isWeddingTheme ? `WED-0${pIdx + 1}` : isBirthdayTheme ? `BIR-0${pIdx + 1}` : isCorporateTheme ? `COR-0${pIdx + 1}` : isGraduationTheme ? `GRA-0${pIdx + 1}` : `0${pIdx + 1}A`}
-                                  </span>
-                                )}
-                              </div>
-                            </React.Fragment>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Bottom Footer Inscription */}
-                      <div className="w-full pt-2 border-t text-center mt-1" style={{ borderColor: isSchoolTheme ? schoolPalette.borderGold : isPartyTheme ? 'rgba(236, 72, 153, 0.4)' : isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)' }}>
-                        {isSchoolTheme ? (
-                          <>
-                            <div className="py-0.5 flex items-center justify-center">
-                              <SchoolAcademicFooterIcon width={120} height={18} isLight={isSchoolLight} />
-                            </div>
-                            {activePlanConfig.watermark !== false ? (
-                              <div className="mt-1 flex items-center justify-center">
-                                <span
-                                  className="text-[6px] font-mono uppercase tracking-[0.2em] px-1.5 py-0.5 rounded-full"
-                                  style={{
-                                    backgroundColor: isSchoolLight ? 'rgba(133, 93, 16, 0.12)' : 'rgba(212, 175, 55, 0.15)',
-                                    color: schoolPalette.textSecondary,
-                                  }}
-                                >
-                                  MEMORA WATERMARK INCLUDED
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: schoolPalette.textSecondary }}>
-                                <Logo className="w-2.5 h-2.5 shrink-0" />
-                                <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
-                                  MEMORA
-                                </span>
-                              </div>
-                            )}
-                          </>
-                        ) : isBeachTheme ? (
-                          <>
-                            <div className="py-0.5 flex items-center justify-center">
-                              <CoastalWaveFooterIcon width={120} height={16} />
-                            </div>
-                            {activePlanConfig.watermark !== false ? (
-                              <div className="mt-1 flex items-center justify-center">
-                                <span
-                                  className="text-[6px] font-mono uppercase tracking-[0.2em] px-1.5 py-0.5 rounded-full"
-                                  style={{
-                                    backgroundColor: 'rgba(2, 132, 199, 0.1)',
-                                    color: '#0284c7',
-                                  }}
-                                >
-                                  MEMORA WATERMARK INCLUDED
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#0284c7' }}>
-                                <Logo className="w-2.5 h-2.5 shrink-0" />
-                                <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
-                                  MEMORA
-                                </span>
-                              </div>
-                            )}
-                          </>
-                        ) : isPartyTheme ? (
-                          <>
-                            <div className="py-0.5 flex items-center justify-center">
-                              <PartyEqualizerFooterIcon width={120} height={16} />
-                            </div>
-                            {activePlanConfig.watermark !== false ? (
-                              <div className="mt-1 flex items-center justify-center">
-                                <span
-                                  className="text-[6px] font-mono uppercase tracking-[0.2em] px-1.5 py-0.5 rounded-full"
-                                  style={{
-                                    backgroundColor: 'rgba(236, 72, 153, 0.12)',
-                                    color: '#ec4899',
-                                  }}
-                                >
-                                  MEMORA WATERMARK INCLUDED
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#ec4899' }}>
-                                <Logo className="w-2.5 h-2.5 shrink-0" />
-                                <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
-                                  MEMORA
-                                </span>
-                              </div>
-                            )}
-                          </>
-                        ) : isWeddingTheme ? (
-                          <>
-                            <div className="py-0.5 flex items-center justify-center">
-                              <WeddingBotanicalFooterIcon width={120} height={18} />
-                            </div>
-                            {activePlanConfig.watermark !== false ? (
-                              <div className="mt-1 flex items-center justify-center">
-                                <span
-                                  className="text-[6px] font-mono uppercase tracking-[0.2em] px-1.5 py-0.5 rounded-full"
-                                  style={{
-                                    backgroundColor: 'rgba(184, 134, 11, 0.12)',
-                                    color: '#b8860b',
-                                  }}
-                                >
-                                  MEMORA WATERMARK INCLUDED
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#b8860b' }}>
-                                <Logo className="w-2.5 h-2.5 shrink-0" />
-                                <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
-                                  MEMORA
-                                </span>
-                              </div>
-                            )}
-                          </>
-                        ) : isBirthdayTheme ? (
-                          <>
-                            <div className="py-0.5 flex items-center justify-center">
-                              <BirthdayBuntingFooterIcon width={120} height={18} />
-                            </div>
-                            {activePlanConfig.watermark !== false ? (
-                              <div className="mt-1 flex items-center justify-center">
-                                <span
-                                  className="text-[6px] font-mono uppercase tracking-[0.2em] px-1.5 py-0.5 rounded-full"
-                                  style={{
-                                    backgroundColor: 'rgba(217, 119, 6, 0.12)',
-                                    color: '#d97706',
-                                  }}
-                                >
-                                  MEMORA WATERMARK INCLUDED
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#d97706' }}>
-                                <Logo className="w-2.5 h-2.5 shrink-0" />
-                                <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
-                                  MEMORA
-                                </span>
-                              </div>
-                            )}
-                          </>
-                        ) : isCorporateTheme ? (
-                          <>
-                            <div className="py-0.5 flex items-center justify-center">
-                              <CorporateSkylineFooterIcon width={120} height={18} />
-                            </div>
-                            {activePlanConfig.watermark !== false ? (
-                              <div className="mt-1 flex items-center justify-center">
-                                <span
-                                  className="text-[6px] font-mono uppercase tracking-[0.2em] px-1.5 py-0.5 rounded-full"
-                                  style={{
-                                    backgroundColor: 'rgba(37, 99, 235, 0.12)',
-                                    color: '#2563eb',
-                                  }}
-                                >
-                                  MEMORA WATERMARK INCLUDED
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#2563eb' }}>
-                                <Logo className="w-2.5 h-2.5 shrink-0" />
-                                <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
-                                  MEMORA
-                                </span>
-                              </div>
-                            )}
-                          </>
-                        ) : isGraduationTheme ? (
-                          <>
-                            <div className="py-0.5 flex items-center justify-center">
-                              <GraduationDiplomaFooterIcon width={120} height={18} />
-                            </div>
-                            {activePlanConfig.watermark !== false ? (
-                              <div className="mt-1 flex items-center justify-center">
-                                <span
-                                  className="text-[6px] font-mono uppercase tracking-[0.2em] px-1.5 py-0.5 rounded-full"
-                                  style={{
-                                    backgroundColor: 'rgba(212, 175, 55, 0.15)',
-                                    color: '#d4af37',
-                                  }}
-                                >
-                                  MEMORA WATERMARK INCLUDED
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#d4af37' }}>
-                                <Logo className="w-2.5 h-2.5 shrink-0" />
-                                <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
-                                  MEMORA
-                                </span>
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            <p className="font-display text-[10px] tracking-wide flex items-center justify-center gap-1" style={{ color: selectedTemplate.textColor }}>
-                              {matchedEventType ? <span>{getEventEmoji(matchedEventType)}</span> : null}
-                              <span>{eventName.toUpperCase()}</span>
-                            </p>
-                            <p className="text-[8px] font-mono opacity-65 tracking-wider mt-0.5">
-                              {activeLayout.shots} {activeLayout.shots === 1 ? 'Pose' : 'Poses'} • {activeLayout.label}
-                            </p>
-                            {activePlanConfig.watermark !== false ? (
-                              <div className="mt-1 flex items-center justify-center">
-                                <span
-                                  className="text-[6px] font-mono uppercase tracking-[0.2em] px-1.5 py-0.5 rounded-full"
-                                  style={{
-                                    backgroundColor: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.12)',
-                                    color: selectedTemplate.textColor,
-                                  }}
-                                >
-                                  MEMORA WATERMARK INCLUDED
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: selectedTemplate.textColor }}>
-                                <Logo className="w-2.5 h-2.5 shrink-0" />
-                                <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
-                                  MEMORA
-                                </span>
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </div>
+                    {renderStripDesign()}
                   </div>
                 </div>
               </div>
@@ -4630,109 +5321,43 @@ export function MemoraBooth({
           </div>
         )}
 
-        {/* Phase 2 & 3: Camera & Editing */}
-        {phase !== 'intro' && (
-          <>
-            <div
-              className={`relative w-full overflow-hidden rounded-[26px] ${
-                phase === 'editing' ? 'aspect-[3/5] bg-transparent' : 'aspect-[3/4] bg-black'
-              }`}
-            >
+        {/* Phase 2: Shooting */}
+        {phase === 'shooting' && (
+          <div className="flex-1 flex flex-col justify-center items-center w-full my-auto py-2">
+            {/* Camera Viewfinder */}
+            <div className="relative w-full overflow-hidden rounded-[26px] aspect-[4/3] bg-black shadow-2xl ring-1 ring-white/10">
               <video
                 ref={videoRef}
                 playsInline
                 muted
                 autoPlay
-                className={`h-full w-full object-cover ${facing === 'user' ? '-scale-x-100' : ''} ${
-                  phase === 'editing' ? 'opacity-0' : ''
-                }`}
+                className={`h-full w-full object-cover ${facing === 'user' ? '-scale-x-100' : ''}`}
                 style={{ filter: activeFilter.css }}
               />
 
               {/* Viewfinder Top Controls: Ultra-Minimalist Glass Bar */}
-              {phase === 'shooting' && (
-                <div className="absolute top-3.5 left-3.5 right-3.5 z-20 flex items-center justify-between pointer-events-auto gap-2">
-                  {/* Selected Template & Layout Badge Pill */}
-                  <div className="flex items-center gap-1.5 rounded-full bg-black/50 backdrop-blur-md border border-white/15 px-3 py-1 font-mono text-[10px] text-cream/90 shadow-sm select-none">
-                    <span
-                      className="w-2 h-2 rounded-full border border-white/30 shrink-0"
-                      style={{ backgroundColor: selectedTemplate.frameColor }}
-                    />
-                    <span className="font-medium truncate max-w-[110px] sm:max-w-[140px]">{selectedTemplate.name}</span>
-                    <span className="text-white/30">•</span>
-                    <span className="text-primary font-semibold">{activeLayout.label}</span>
-                  </div>
-
-                  {/* Countdown Duration Minimal Selector */}
-                  <div className="flex items-center gap-0.5 rounded-full bg-black/50 backdrop-blur-md border border-white/15 p-0.5 font-mono text-[10px] shadow-sm select-none">
-                    <Timer className="w-3 h-3 text-cream/40 ml-1.5 mr-0.5 shrink-0" />
-                    {COUNTDOWNS.map((sec) => (
-                      <button
-                        key={sec}
-                        type="button"
-                        onClick={() => setCountdownDuration(sec)}
-                        disabled={currentCountdown !== null}
-                        className={`px-2 py-0.5 rounded-full transition-all cursor-pointer ${
-                          countdownDuration === sec
-                            ? 'bg-white/15 text-cream font-medium border border-white/15 shadow-2xs'
-                            : 'text-cream/45 hover:text-cream/80'
-                        }`}
-                        title={`Countdown: ${sec === 0 ? 'Off' : `${sec}s`}`}
-                      >
-                        {sec === 0 ? '0s' : `${sec}s`}
-                      </button>
-                    ))}
-                  </div>
+              <div className="absolute top-3.5 left-3.5 right-3.5 z-20 flex items-center justify-end pointer-events-auto gap-2">
+                {/* Countdown Duration Minimal Selector */}
+                <div className="flex items-center gap-0.5 rounded-full bg-black/50 backdrop-blur-md border border-white/15 p-0.5 font-mono text-[10px] shadow-sm select-none">
+                  <Timer className="w-3 h-3 text-cream/40 ml-1.5 mr-0.5 shrink-0" />
+                  {COUNTDOWNS.map((sec) => (
+                    <button
+                      key={sec}
+                      type="button"
+                      onClick={() => setCountdownDuration(sec)}
+                      disabled={currentCountdown !== null}
+                      className={`px-2 py-0.5 rounded-full transition-all cursor-pointer ${
+                        countdownDuration === sec
+                          ? 'bg-white/15 text-cream font-medium border border-white/15 shadow-2xs'
+                          : 'text-cream/45 hover:text-cream/80'
+                      }`}
+                      title={`Countdown: ${sec === 0 ? 'Off' : `${sec}s`}`}
+                    >
+                      {sec === 0 ? '0s' : `${sec}s`}
+                    </button>
+                  ))}
                 </div>
-              )}
-
-              {/* Editing Preview Render: Static Strip & Animated GIF */}
-              {phase === 'editing' && (
-                <>
-                  {previewFormat === 'gif' && renderedGifUrl ? (
-                    <img
-                      src={renderedGifUrl}
-                      alt="Your animated photo strip GIF"
-                      className="absolute inset-0 h-full w-full object-contain"
-                    />
-                  ) : renderedStripUrl ? (
-                    <img
-                      src={renderedStripUrl}
-                      alt="Your photo strip"
-                      className="absolute inset-0 h-full w-full object-contain"
-                    />
-                  ) : null}
-
-                  {/* Format switcher pill when GIF is enabled */}
-                  {isGifAllowed && (
-                    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 rounded-full bg-black/75 backdrop-blur-md p-1 border border-white/20 shadow-xl select-none">
-                      <button
-                        type="button"
-                        onClick={() => setPreviewFormat('strip')}
-                        className={`px-3 py-1 rounded-full font-mono text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
-                          previewFormat === 'strip'
-                            ? 'bg-cream text-foreground font-semibold shadow-xs'
-                            : 'text-cream/60 hover:text-cream'
-                        }`}
-                      >
-                        Static Strip
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPreviewFormat('gif')}
-                        className={`flex items-center gap-1 px-3 py-1 rounded-full font-mono text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
-                          previewFormat === 'gif'
-                            ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
-                            : 'text-cream/60 hover:text-cream'
-                        }`}
-                      >
-                        <span>Animated GIF</span>
-                        <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
+              </div>
 
               {/* Countdown Overlay with Cancel Option */}
               {currentCountdown !== null && (
@@ -4758,12 +5383,12 @@ export function MemoraBooth({
               )}
 
               {/* Mini Shot Thumbnail Previews at Bottom of Viewfinder: Only appears once a shot is taken */}
-              {phase === 'shooting' && capturedShots.length > 0 && (
+              {capturedShots.length > 0 && (
                 <div className="absolute bottom-3 left-3 right-3 z-20 flex items-center justify-center gap-1.5 pointer-events-none animate-fade-in">
                   {Array.from({ length: activeLayout.shots }).map((_, idx) => (
                     <div
                       key={idx}
-                      className={`h-11 w-8 sm:h-12 sm:w-9 rounded-md overflow-hidden border transition-all shadow-md ${
+                      className={`h-9 w-12 sm:h-10 sm:w-14 rounded-md overflow-hidden border transition-all shadow-md ${
                         idx < capturedShots.length
                           ? 'border-white/50 bg-stone-900 ring-1 ring-black/40'
                           : idx === capturedShots.length && currentCountdown !== null
@@ -4788,7 +5413,7 @@ export function MemoraBooth({
               )}
 
               {/* Error Overlay during shooting */}
-              {errorMessage && phase === 'shooting' && (
+              {errorMessage && (
                 <div className="absolute inset-0 grid place-items-center bg-foreground/90 p-6 text-center z-30">
                   <div>
                     <p className="text-sm text-cream/80">{errorMessage}</p>
@@ -4805,136 +5430,199 @@ export function MemoraBooth({
             </div>
 
             {/* Bottom Controls: Shooting Phase */}
-            {phase === 'shooting' ? (
-              <div className="mt-auto pt-4">
-                <div className="flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={flipCamera}
-                    disabled={!hasMultipleCameras}
-                    aria-label="Switch camera"
-                    className="grid size-12 place-items-center rounded-full bg-cream/10 text-sm font-semibold text-cream disabled:opacity-40 hover:bg-cream/15 transition-colors cursor-pointer"
-                  >
-                    ↻
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleSnapClick()}
-                    disabled={status !== 'ready' || currentCountdown !== null}
-                    className="grid size-20 place-items-center rounded-full bg-primary font-display text-2xl text-primary-foreground ring-4 ring-cream/70 disabled:opacity-60 transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-lg"
-                  >
-                    SNAP
-                  </button>
-                  <div className="flex flex-col items-center">
-                    <span className="grid size-12 place-items-center rounded-full bg-cream/10 font-mono text-[10px] uppercase tracking-widest text-cream/70">
-                      {capturedShots.length > 0 ? `${capturedShots.length}/${activeLayout.shots}` : `x${activeLayout.shots}`}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="pt-3 text-center">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-cream/75">
-                    {capturedShots.length === 0
-                      ? `Tap SNAP to capture all ${activeLayout.shots} photos with live countdown`
-                      : `Shot ${capturedShots.length} of ${activeLayout.shots} captured`}
-                  </p>
+            <div className="w-full pt-6 sm:pt-8">
+              <div className="flex items-center justify-between px-2">
+                <button
+                  type="button"
+                  onClick={flipCamera}
+                  disabled={!hasMultipleCameras}
+                  aria-label="Switch camera"
+                  className="grid size-12 place-items-center rounded-full bg-cream/10 text-sm font-semibold text-cream disabled:opacity-40 hover:bg-cream/15 transition-colors cursor-pointer"
+                >
+                  ↻
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleSnapClick()}
+                  disabled={status !== 'ready' || currentCountdown !== null}
+                  aria-label="Capture photos"
+                  className="grid size-20 place-items-center rounded-full bg-primary text-primary-foreground ring-4 ring-cream/70 disabled:opacity-60 transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-lg"
+                >
+                  <Logo variant="glyph" className="w-12 h-12 text-primary-foreground" />
+                </button>
+                <div className="flex flex-col items-center">
+                  <span className="grid size-12 place-items-center rounded-full bg-cream/10 font-mono text-[10px] uppercase tracking-widest text-cream/70">
+                    {capturedShots.length > 0 ? `${capturedShots.length}/${activeLayout.shots}` : `x${activeLayout.shots}`}
+                  </span>
                 </div>
               </div>
-            ) : (
-              /* Bottom Controls: Editing Phase */
-              <div className="mt-auto space-y-4 pt-5">
-                {/* Filter Pill Selector */}
-                <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-none">
-                  {FILTERS.map((f) => (
-                    <button
-                      key={f.id}
-                      type="button"
-                      onClick={() => setFilterId(f.id)}
-                      className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${
-                        filterId === f.id ? 'bg-cream text-foreground' : 'bg-cream/10 text-cream/70 hover:bg-cream/15'
-                      }`}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
 
-                {/* Frame Swatches and Caption Input */}
-                <div className="flex items-center gap-2">
-                  {FRAMES.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setFrameId(item.id)}
-                      aria-label={`${item.label} frame`}
-                      style={{ backgroundColor: item.paper }}
-                      className={`size-9 rounded-lg transition-all cursor-pointer ${
-                        frameId === item.id ? 'ring-2 ring-cream scale-105' : 'ring-1 ring-cream/30 hover:ring-cream/60'
-                      }`}
-                    />
-                  ))}
-                  <input
-                    type="text"
-                    value={caption}
-                    onChange={(e) => setCaption(e.target.value)}
-                    maxLength={44}
-                    placeholder="Add a caption"
-                    className="ml-2 min-w-0 flex-1 rounded-full bg-cream/10 px-4 py-2.5 text-sm text-cream placeholder:text-cream/40 focus:outline-none focus:ring-2 focus:ring-primary"
+              <div className="pt-3 text-center">
+                <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-cream/75">
+                  {capturedShots.length === 0
+                    ? `Tap to capture all ${activeLayout.shots} photos with live countdown`
+                    : `Shot ${capturedShots.length} of ${activeLayout.shots} captured`}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Phase 3: Editing */}
+        {phase === 'editing' && (
+          <div className="flex-1 flex flex-col justify-between w-full">
+            {/* Format switcher pill when GIF is enabled in editing phase - placed cleanly above preview so it never covers the header */}
+            {isGifAllowed && (
+              <div className="flex items-center justify-center mb-3 z-30 select-none">
+                <div className="flex items-center gap-1 rounded-full bg-black/75 backdrop-blur-md p-1 border border-white/20 shadow-xl">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewFormat('strip')}
+                    className={`px-3.5 py-1 rounded-full font-mono text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
+                      previewFormat === 'strip'
+                        ? 'bg-cream text-foreground font-semibold shadow-xs'
+                        : 'text-cream/60 hover:text-cream'
+                    }`}
+                  >
+                    Static Strip
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewFormat('gif')}
+                    className={`flex items-center gap-1.5 px-3.5 py-1 rounded-full font-mono text-[10px] uppercase tracking-wider transition-all cursor-pointer ${
+                      previewFormat === 'gif'
+                        ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
+                        : 'text-cream/60 hover:text-cream'
+                    }`}
+                  >
+                    <span>Animated GIF</span>
+                    <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Editing Preview Render: Static Strip & Animated GIF */}
+            <div className="relative w-full overflow-hidden rounded-[26px] flex items-center justify-center bg-transparent py-2 min-h-[500px] max-h-[75vh]">
+              <div className="relative flex items-center justify-center w-full h-full max-h-[72vh]">
+                {previewFormat === 'gif' && renderedGifUrl ? (
+                  <img
+                    src={renderedGifUrl}
+                    alt="Your animated photo strip GIF"
+                    className="max-h-[70vh] w-auto max-w-full rounded-xl object-contain drop-shadow-2xl transition-all"
                   />
-                </div>
-
-                {renderError && <p className="text-sm text-destructive">{renderError}</p>}
-
-                {/* Action Buttons: Retake, Download PNG, Download GIF */}
-                {isGifAllowed ? (
-                  <div className="space-y-2.5">
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (renderedStripUrl) {
-                            const cleanName = eventName.toLowerCase().replace(/\s+/g, '-');
-                            triggerDownload(renderedStripUrl, `${cleanName}-strip.png`, eventName);
-                          }
-                        }}
-                        disabled={isRendering || !renderedStripUrl}
-                        className="flex items-center justify-center gap-1.5 rounded-full border border-cream/25 py-3.5 text-xs sm:text-sm font-semibold text-cream hover:bg-cream/10 transition-colors disabled:opacity-50 cursor-pointer"
-                      >
-                        <span>Download PNG</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (renderedGifUrl) {
-                            const cleanName = eventName.toLowerCase().replace(/\s+/g, '-');
-                            triggerDownload(renderedGifUrl, `${cleanName}-strip.gif`, eventName);
-                          }
-                        }}
-                        disabled={isRenderingGif || !renderedGifUrl}
-                        className="flex items-center justify-center gap-1.5 rounded-full bg-primary py-3.5 text-xs sm:text-sm font-semibold text-primary-foreground disabled:opacity-50 hover:opacity-95 transition-opacity cursor-pointer shadow-md"
-                      >
-                        <span>{isRenderingGif ? 'Making GIF…' : 'Download GIF'}</span>
-                        <Sparkles className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                    <div className="flex justify-center">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPhase('shooting');
-                          setCapturedShots([]);
-                          setRenderedStripUrl(null);
-                          setRenderedGifUrl(null);
-                        }}
-                        className="inline-flex items-center gap-1.5 font-mono text-[11px] text-cream/60 hover:text-cream transition-colors cursor-pointer py-1"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        <span>Retake photos</span>
-                      </button>
-                    </div>
-                  </div>
                 ) : (
-                  <div className="flex gap-3">
+                  <div className="max-h-[70vh] overflow-y-auto py-3 px-2 scrollbar-none flex justify-center items-start w-full">
+                    {renderStripDesign(capturedShots, stripExportRef)}
+                  </div>
+                )}
+
+                {/* Offscreen DOM element when viewing GIF so toPng can still capture PNG without unmounting */}
+                {previewFormat === 'gif' && (
+                  <div
+                    aria-hidden="true"
+                    style={{ position: 'fixed', left: -9999, top: 0, pointerEvents: 'none' }}
+                  >
+                    {renderStripDesign(capturedShots, stripExportRef)}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Bottom Controls: Editing Phase */}
+            <div className="mt-auto space-y-4 pt-5">
+              {/* Filter Pill Selector */}
+              <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-none">
+                {FILTERS.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setFilterId(f.id)}
+                    className={`shrink-0 rounded-full px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${
+                      filterId === f.id ? 'bg-cream text-foreground' : 'bg-cream/10 text-cream/70 hover:bg-cream/15'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Frame Swatches and Caption Input */}
+              <div className="flex items-center gap-2">
+                {FRAMES.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setFrameId(item.id)}
+                    aria-label={`${item.label} frame`}
+                    style={{ backgroundColor: item.paper }}
+                    className={`size-9 rounded-lg transition-all cursor-pointer ${
+                      frameId === item.id ? 'ring-2 ring-cream scale-105' : 'ring-1 ring-cream/30 hover:ring-cream/60'
+                    }`}
+                  />
+                ))}
+                <input
+                  type="text"
+                  value={caption}
+                  onChange={(e) => setCaption(e.target.value)}
+                  maxLength={44}
+                  placeholder="Add a caption"
+                  className="ml-2 min-w-0 flex-1 rounded-full bg-cream/10 px-4 py-2.5 text-sm text-cream placeholder:text-cream/40 focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              {renderError && <p className="text-sm text-destructive">{renderError}</p>}
+
+              {/* Action Buttons: Retake, Download PNG, Download GIF */}
+              {isGifAllowed ? (
+                <div className="space-y-2.5">
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const cleanName = eventName.toLowerCase().replace(/\s+/g, '-');
+                        if (stripExportRef.current) {
+                          try {
+                            setIsRendering(true);
+                            const dataUrl = await toPng(stripExportRef.current, {
+                              pixelRatio: 4,
+                              cacheBust: true,
+                              skipFonts: true,
+                            });
+                            triggerDownload(dataUrl, `${cleanName}-strip.png`, eventName);
+                          } catch (err) {
+                            console.warn('DOM export notice, falling back to canvas strip render:', err);
+                            if (renderedStripUrl) {
+                              triggerDownload(renderedStripUrl, `${cleanName}-strip.png`, eventName);
+                            }
+                          } finally {
+                            setIsRendering(false);
+                          }
+                        } else if (renderedStripUrl) {
+                          triggerDownload(renderedStripUrl, `${cleanName}-strip.png`, eventName);
+                        }
+                      }}
+                      disabled={isRendering}
+                      className="flex items-center justify-center gap-1.5 rounded-full border border-cream/25 py-3.5 text-xs sm:text-sm font-semibold text-cream hover:bg-cream/10 transition-colors disabled:opacity-50 cursor-pointer"
+                    >
+                      <span>{isRendering ? 'Saving…' : 'Download PNG'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (renderedGifUrl) {
+                          const cleanName = eventName.toLowerCase().replace(/\s+/g, '-');
+                          triggerDownload(renderedGifUrl, `${cleanName}-strip.gif`, eventName);
+                        }
+                      }}
+                      disabled={isRenderingGif || !renderedGifUrl}
+                      className="flex items-center justify-center gap-1.5 rounded-full bg-primary py-3.5 text-xs sm:text-sm font-semibold text-primary-foreground disabled:opacity-50 hover:opacity-95 transition-opacity cursor-pointer shadow-md"
+                    >
+                      <span>{isRenderingGif ? 'Making GIF…' : 'Download GIF'}</span>
+                      <Sparkles className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex justify-center">
                     <button
                       type="button"
                       onClick={() => {
@@ -4943,28 +5631,61 @@ export function MemoraBooth({
                         setRenderedStripUrl(null);
                         setRenderedGifUrl(null);
                       }}
-                      className="flex-1 rounded-full border border-cream/25 py-3.5 text-sm font-semibold text-cream hover:bg-cream/10 transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1.5 font-mono text-[11px] text-cream/60 hover:text-cream transition-colors cursor-pointer py-1"
                     >
-                      Retake
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (renderedStripUrl) {
-                          const cleanName = eventName.toLowerCase().replace(/\s+/g, '-');
-                          triggerDownload(renderedStripUrl, `${cleanName}-strip.png`, eventName);
-                        }
-                      }}
-                      disabled={isRendering || !renderedStripUrl}
-                      className="flex-[1.4] rounded-full bg-primary py-3.5 text-sm font-semibold text-primary-foreground disabled:opacity-60 hover:opacity-95 transition-opacity cursor-pointer"
-                    >
-                      {isRendering ? 'Rendering…' : 'Download strip'}
+                      <RotateCcw className="w-3 h-3" />
+                      <span>Retake photos</span>
                     </button>
                   </div>
-                )}
-              </div>
-            )}
-          </>
+                </div>
+              ) : (
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhase('shooting');
+                      setCapturedShots([]);
+                      setRenderedStripUrl(null);
+                      setRenderedGifUrl(null);
+                    }}
+                    className="flex-1 rounded-full border border-cream/25 py-3.5 text-sm font-semibold text-cream hover:bg-cream/10 transition-colors cursor-pointer"
+                  >
+                    Retake
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const cleanName = eventName.toLowerCase().replace(/\s+/g, '-');
+                      if (stripExportRef.current) {
+                        try {
+                          setIsRendering(true);
+                          const dataUrl = await toPng(stripExportRef.current, {
+                            pixelRatio: 4,
+                            cacheBust: true,
+                            skipFonts: true,
+                          });
+                          triggerDownload(dataUrl, `${cleanName}-strip.png`, eventName);
+                        } catch (err) {
+                          console.warn('DOM export notice, falling back to canvas strip render:', err);
+                          if (renderedStripUrl) {
+                            triggerDownload(renderedStripUrl, `${cleanName}-strip.png`, eventName);
+                          }
+                        } finally {
+                          setIsRendering(false);
+                        }
+                      } else if (renderedStripUrl) {
+                        triggerDownload(renderedStripUrl, `${cleanName}-strip.png`, eventName);
+                      }
+                    }}
+                    disabled={isRendering}
+                    className="flex-[1.4] rounded-full bg-primary py-3.5 text-sm font-semibold text-primary-foreground disabled:opacity-60 hover:opacity-95 transition-opacity cursor-pointer"
+                  >
+                    {isRendering ? 'Rendering…' : 'Download strip'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </div>

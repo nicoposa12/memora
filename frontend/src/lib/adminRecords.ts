@@ -372,18 +372,20 @@ export function createOrUpdateCustomerFromUser(user: any): RealCustomerRecord | 
     : 'Free Trial';
 
   if (existingIndex >= 0) {
+    const isPaid = tier === 'Studio Pro' || tier === 'Event Pass';
     current[existingIndex] = {
       ...current[existingIndex],
       name: user.name || current[existingIndex].name,
       role: user.role || current[existingIndex].role,
       tier: tier,
       status: user.subscription_status === 'suspended' ? 'suspended' : 'active',
-      subscriptionExpiresAt: user.subscription_expires_at || current[existingIndex].subscriptionExpiresAt,
-      subscriptionGraceUntil: user.subscription_grace_until || current[existingIndex].subscriptionGraceUntil,
+      subscriptionExpiresAt: isPaid ? (user.subscription_expires_at || current[existingIndex].subscriptionExpiresAt) : undefined,
+      subscriptionGraceUntil: isPaid ? (user.subscription_grace_until || current[existingIndex].subscriptionGraceUntil) : undefined,
     };
     saveRealCustomers(current);
     return current[existingIndex];
   } else {
+    const isPaid = tier === 'Studio Pro' || tier === 'Event Pass';
     const newCustomer: RealCustomerRecord = {
       id: user.id ? `USR-${user.id}` : `USR-${Math.floor(1000 + Math.random() * 9000)}`,
       name: user.name || 'Organizer',
@@ -396,8 +398,8 @@ export function createOrUpdateCustomerFromUser(user: any): RealCustomerRecord | 
       storageMb: 0,
       status: 'active',
       joinedDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      subscriptionExpiresAt: user.subscription_expires_at,
-      subscriptionGraceUntil: user.subscription_grace_until,
+      subscriptionExpiresAt: isPaid ? user.subscription_expires_at : undefined,
+      subscriptionGraceUntil: isPaid ? user.subscription_grace_until : undefined,
       billingCycle: tier === 'Studio Pro' ? 'monthly' : tier === 'Event Pass' ? 'per_event' : 'none',
       renewalStatus: 'active',
     };
@@ -429,6 +431,7 @@ export async function fetchBackendCustomers(): Promise<RealCustomerRecord[]> {
           ? 'Event Pass' 
           : 'Free Trial';
 
+        const hasPaidTier = tier === 'Studio Pro' || tier === 'Event Pass';
         const joinedDate = u.created_at
           ? new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
           : (existing?.joinedDate || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }));
@@ -445,8 +448,8 @@ export async function fetchBackendCustomers(): Promise<RealCustomerRecord[]> {
           storageMb: existing?.storageMb ?? 0,
           status: (u.subscription_status === 'suspended' ? 'suspended' : 'active') as 'active' | 'suspended',
           joinedDate: joinedDate,
-          subscriptionExpiresAt: u.subscription_expires_at || existing?.subscriptionExpiresAt,
-          subscriptionGraceUntil: u.subscription_grace_until || existing?.subscriptionGraceUntil,
+          subscriptionExpiresAt: hasPaidTier ? (u.subscription_expires_at || existing?.subscriptionExpiresAt) : undefined,
+          subscriptionGraceUntil: hasPaidTier ? (u.subscription_grace_until || existing?.subscriptionGraceUntil) : undefined,
           billingCycle: (tier === 'Studio Pro' ? 'monthly' : tier === 'Event Pass' ? 'per_event' : 'none') as any,
           renewalStatus: (u.subscription_status || 'active') as any,
         };
@@ -470,7 +473,14 @@ export function updateRealCustomer(id: string, updates: Partial<RealCustomerReco
   const current = getRealCustomers();
   const index = current.findIndex(c => c.id === id);
   if (index === -1) return null;
-  current[index] = { ...current[index], ...updates };
+
+  const merged = { ...current[index], ...updates };
+  if (merged.tier === 'Free Trial') {
+    delete merged.subscriptionExpiresAt;
+    delete merged.subscriptionGraceUntil;
+    merged.billingCycle = 'none';
+  }
+  current[index] = merged;
   saveRealCustomers(current);
 
   // Sync if this user is the active logged in session

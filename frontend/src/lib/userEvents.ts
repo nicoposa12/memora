@@ -41,13 +41,13 @@ export function isEventOwner(event: any, user: StoredUser | null): boolean {
     return true;
   }
 
-  const currentEmail = (user.email || '').toLowerCase().trim();
-  const currentUserId = (user.id || '').trim();
-  const currentName = (user.name || '').toLowerCase().trim();
+  const currentEmail = String(user.email || '').toLowerCase().trim();
+  const currentUserId = String(user.id || '').trim();
+  const currentName = String(user.name || '').toLowerCase().trim();
 
-  const eventEmail = (event.organizerEmail || event.userEmail || '').toLowerCase().trim();
-  const eventUserId = (event.userId || '').trim();
-  const eventOrganizerName = (event.organizerName || '').toLowerCase().trim();
+  const eventEmail = String(event.organizerEmail || event.userEmail || '').toLowerCase().trim();
+  const eventUserId = String(event.userId || '').trim();
+  const eventOrganizerName = String(event.organizerName || '').toLowerCase().trim();
 
   // 1. Direct match on creator email
   if (eventEmail && currentEmail && eventEmail === currentEmail) {
@@ -123,9 +123,10 @@ export function getScopedEvents(user?: StoredUser | null): any[] {
 /**
  * Safely delete an event by ID from the global list without affecting other users' events.
  */
-export function deleteStoredEvent(eventId: string): any[] {
+export function deleteStoredEvent(eventId: string | number): any[] {
   const allEvents = getAllEvents();
-  const updated = allEvents.filter(e => e.id !== eventId);
+  const cleanId = String(eventId);
+  const updated = allEvents.filter((e) => String(e.id) !== cleanId);
   saveAllEvents(updated);
   return updated;
 }
@@ -135,7 +136,8 @@ export function deleteStoredEvent(eventId: string): any[] {
  */
 export function updateStoredEvent(updatedEvent: any): any[] {
   const allEvents = getAllEvents();
-  const updated = allEvents.map(e => e.id === updatedEvent.id ? { ...e, ...updatedEvent } : e);
+  const cleanId = String(updatedEvent.id);
+  const updated = allEvents.map((e) => (String(e.id) === cleanId ? { ...e, ...updatedEvent } : e));
   saveAllEvents(updated);
   return updated;
 }
@@ -236,15 +238,24 @@ export function getUserEventLimitStatus(user?: StoredUser | null): EventLimitSta
     };
   }
 
-  // 4. Free account (requires PRO pass or STUDIO subscription)
+  // 4. Free / Trial account (includes 1 trial event)
+  const maxEvents = 1;
+  const allowed = count < maxEvents;
+  const firstEvent = scoped[0];
   return {
-    allowed: false,
-    maxEvents: 0,
+    allowed,
+    maxEvents,
     currentCount: count,
-    planName: 'Free Account',
+    planName: 'Free Trial',
     isProPass: false,
     isStudio: false,
     isAdmin: false,
-    reason: 'An active PRO Event Pass or STUDIO Subscription is required to create an event.',
+    existingEventName: firstEvent?.name || firstEvent?.title,
+    existingEventSlug: firstEvent?.slug,
+    existingEventDate: firstEvent?.date,
+    existingEventType: firstEvent?.eventType,
+    reason: !allowed
+      ? `Your Free Trial includes 1 event. You currently have 1 active event ("${firstEvent?.name || 'Your Event'}"). Upgrade to STUDIO Monthly for unlimited concurrent events.`
+      : undefined,
   };
 }

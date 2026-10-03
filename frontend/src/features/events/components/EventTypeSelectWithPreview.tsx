@@ -741,25 +741,6 @@ export function EventTypeSelectWithPreview({
                       {isGraduationTheme && (
                         <GraduationPhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
                       )}
-
-                      {/* Frame Code Tag */}
-                      {!isSchoolTheme && (
-                        <span
-                          className="absolute bottom-0.5 right-1 text-[5.5px] font-mono px-1 py-0.2 rounded font-semibold"
-                          style={{
-                            backgroundColor: `${activePalette.accentColor}18`,
-                            color: activePalette.textColor,
-                          }}
-                        >
-                          {isBirthdayTheme
-                            ? `BIR-0${pIdx + 1}`
-                            : isCorporateTheme
-                            ? `COR-0${pIdx + 1}`
-                            : isGraduationTheme
-                            ? `GRA-0${pIdx + 1}`
-                            : `${getEventBareLabel(previewingType).slice(0, 3).toUpperCase()}-0${pIdx + 1}`}
-                        </span>
-                      )}
                     </div>
                   ))}
                 </div>

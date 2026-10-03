@@ -26,7 +26,7 @@ import {
 import { Logo } from '@/components/Logo';
 import { isClientRole, isAdminRole, getRoleDisplayName, UserRole, ClientPlan } from '@/types/user';
 import { getScopedEvents } from '@/lib/userEvents';
-import { formatFirstName } from '@/lib/utils';
+import { formatFirstName, cn } from '@/lib/utils';
 import { apiClient } from '@/lib/api';
 import { useRealtime } from '@/context/RealtimeContext';
 
@@ -67,8 +67,9 @@ export function DashboardSidebar({ onCloseMobile }: DashboardSidebarProps) {
         if (parsed.email) setUserEmail(parsed.email);
         if (parsed.role) setUserRole(parsed.role);
         
-        const hasStudio = parsed.subscription_plan === 'studio' && parsed.subscription_status === 'active';
-        const hasPro = parsed.plan === 'pro';
+        const hasStudio = (parsed.subscription_plan === 'studio' || parsed.plan === 'studio') &&
+          (parsed.subscription_status === 'active' || parsed.subscription_status === 'past_due' || !parsed.subscription_status);
+        const hasPro = parsed.subscription_plan === 'pro' || parsed.plan === 'pro';
         if (hasStudio) {
           setUserPlan('studio');
         } else if (hasPro) {
@@ -282,7 +283,32 @@ export function DashboardSidebar({ onCloseMobile }: DashboardSidebarProps) {
       .substring(0, 2)
       .toUpperCase();
   };
+  const isSysAdmin = isAdminRole(userRole);
 
+  const planBadge = (() => {
+    if (isSysAdmin) {
+      return {
+        label: 'Admin',
+        className: 'bg-primary/15 text-primary border-primary/25',
+      };
+    }
+    if (userPlan === 'studio') {
+      return {
+        label: 'Studio',
+        className: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30',
+      };
+    }
+    if (userPlan === 'pro') {
+      return {
+        label: 'Pro',
+        className: 'bg-primary/10 text-primary border-primary/25',
+      };
+    }
+    return {
+      label: 'Free',
+      className: 'bg-secondary text-muted-foreground border-border/70',
+    };
+  })();
   return (
     <aside className="w-full h-full flex flex-col justify-between bg-card border-r border-border text-foreground select-none">
       {/* Top Brand Header */}
@@ -373,7 +399,7 @@ export function DashboardSidebar({ onCloseMobile }: DashboardSidebarProps) {
         ))}
 
         {/* Differentiated Role Display: System Admin (Admin Only) vs Event Organizer Features */}
-        {isAdminRole(userRole) ? (
+        {isSysAdmin ? (
           <div className="px-1 pt-1">
             <Link
               href="/admin"
@@ -438,9 +464,20 @@ export function DashboardSidebar({ onCloseMobile }: DashboardSidebarProps) {
               {getInitials(userName)}
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-foreground truncate">
-                {userName}
-              </p>
+              <div className="flex items-center gap-1.5 min-w-0">
+                <p className="text-xs font-semibold text-foreground truncate">
+                  {userName}
+                </p>
+                <span
+                  className={cn(
+                    "px-1.5 py-0.5 rounded text-[8.5px] font-mono font-bold uppercase tracking-wider shrink-0 border leading-none select-none",
+                    planBadge.className
+                  )}
+                  title={`Plan: ${planBadge.label}`}
+                >
+                  {planBadge.label}
+                </span>
+              </div>
               <p className="text-[10px] font-mono text-muted-foreground truncate">
                 {userEmail}
               </p>

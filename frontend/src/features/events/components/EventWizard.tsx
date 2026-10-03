@@ -6,11 +6,10 @@ import {
   ArrowLeft, 
   Check, 
   Calendar, 
-  Palette, 
-  Sliders, 
-  Layout, 
   QrCode,
-  Crown
+  Crown,
+  Clock,
+  MapPin
 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
@@ -58,8 +57,11 @@ export function EventWizard() {
     slug: '',
     eventType: 'wedding' as EventType,
     date: new Date().toISOString().split('T')[0],
-    description: '',
+    startTime: '18:00',
+    endTime: '23:00',
+    venueName: '',
     location: '',
+    description: '',
     primaryColor: '#e6c687',
     secondaryColor: '#faf6ee',
     countdown: 3,
@@ -69,8 +71,11 @@ export function EventWizard() {
     templateLayout: 'strip',
   });
 
+  const [nameError, setNameError] = useState<string | null>(null);
+
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const name = e.target.value;
+    if (nameError) setNameError(null);
     setFormData((prev) => ({
       ...prev,
       name,
@@ -79,12 +84,141 @@ export function EventWizard() {
   };
 
   const steps = [
-    { num: 1, label: 'Info', icon: Calendar },
-    { num: 2, label: 'Branding', icon: Palette },
-    { num: 3, label: 'Booth Rules', icon: Sliders },
-    { num: 4, label: 'Template', icon: Layout },
-    { num: 5, label: 'Publish', icon: QrCode },
+    { num: 1, label: 'Details & Venue', icon: Calendar },
+    { num: 2, label: 'Live Booth & QR', icon: QrCode },
   ];
+
+  const handlePublishEvent = () => {
+    const cleanName = (formData.name || '').trim();
+    if (!cleanName) {
+      setNameError('Please provide an event name to publish your booth.');
+      const nameInput = document.getElementById('event-name-input');
+      if (nameInput) {
+        nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        nameInput.focus();
+      }
+      return;
+    }
+
+    try {
+      const freshStatus = getUserEventLimitStatus();
+      if (!freshStatus.allowed) {
+        setLimitStatus(freshStatus);
+        return;
+      }
+
+      const raw = localStorage.getItem('memora_events');
+      const list = raw ? JSON.parse(raw) : [];
+      let userPlan = 'free';
+      let isPremium = false;
+      let organizerEmail = '';
+      let userId = '';
+      let organizerName = 'Organizer';
+
+      const storedUser = localStorage.getItem('memora_user');
+      if (storedUser) {
+        const u = JSON.parse(storedUser);
+        if (u.email) organizerEmail = u.email;
+        if (u.id) userId = u.id;
+        if (u.name) organizerName = u.name;
+        const isAdmin = isAdminRole(u.role) || u.role === 'admin';
+        if (isAdmin || (u.subscription_plan === 'studio' && (u.subscription_status === 'active' || u.subscription_status === 'past_due'))) {
+          userPlan = 'studio';
+          isPremium = true;
+        } else if (u.plan === 'pro' || u.subscription_plan === 'pro') {
+          userPlan = 'pro';
+          isPremium = true;
+        }
+      }
+
+      const venueName = (formData.venueName || '').trim();
+      const location = (formData.location || '').trim();
+      const venueDisplay = venueName
+        ? (location ? `${venueName} • ${location}` : venueName)
+        : (location || 'Private Venue');
+
+      const newEvent = {
+        id: Date.now().toString(),
+        name: cleanName,
+        slug: formData.slug || generateEventSlug(cleanName),
+        eventType: formData.eventType,
+        date: formData.date || new Date().toISOString().split('T')[0],
+        startTime: formData.startTime || '18:00',
+        endTime: formData.endTime || '23:00',
+        venueName: venueName,
+        location: venueDisplay,
+        description: (formData.description || '').trim(),
+        organizerName: organizerName,
+        organizerEmail: organizerEmail,
+        userId: userId,
+        status: 'active',
+        plan: userPlan,
+        isPremium: isPremium,
+        photoCount: 0,
+        primaryColor: formData.primaryColor || '#e6c687',
+        secondaryColor: formData.secondaryColor || '#faf6ee',
+        countdown: formData.countdown ?? 3,
+        templateLayout: formData.templateLayout || 'strip',
+        enableGallery: formData.enableGallery ?? true,
+        watermark: isPremium ? false : (formData.watermark ?? true),
+        maxPhotosPerGuest: isPremium ? 9999 : (formData.maxPhotosPerGuest || 10),
+      };
+
+      list.unshift(newEvent);
+      localStorage.setItem('memora_events', JSON.stringify(list));
+
+      try {
+        const { recordRealAuditLog } = require('@/lib/adminRecords');
+        recordRealAuditLog('Event Created: ' + newEvent.name + ' [plan: ' + userPlan + ']', 'Event Organizer', 'info');
+      } catch {}
+
+      try {
+        const { broadcastRealtime } = require('@/lib/realtime');
+        broadcastRealtime('EVENT_CREATED', {
+          id: newEvent.id,
+          name: newEvent.name,
+          slug: newEvent.slug,
+        });
+        broadcastRealtime('ACTIVITY_LOGGED', {
+          event: 'Event Published: ' + newEvent.name,
+          actor: 'Event Organizer',
+          severity: 'info',
+        });
+      } catch {}
+
+      // Optional backend API sync if token exists
+      try {
+        const token = localStorage.getItem('memora_token');
+        if (token) {
+          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/events`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              name: newEvent.name,
+              slug: newEvent.slug,
+              event_type: newEvent.eventType,
+              event_date: newEvent.date,
+              location: newEvent.location,
+              description: newEvent.description,
+              primary_color: newEvent.primaryColor,
+              secondary_color: newEvent.secondaryColor,
+              countdown_seconds: newEvent.countdown,
+              enable_gallery: newEvent.enableGallery,
+            }),
+          }).catch(() => {});
+        }
+      } catch {}
+
+      setCurrentStep(2);
+    } catch (err) {
+      console.error('Failed to publish event:', err);
+      setCurrentStep(2);
+    }
+  };
 
   if (!isCheckingLimit && limitStatus && !limitStatus.allowed) {
     if (limitStatus.currentCount === 0) {
@@ -293,7 +427,7 @@ export function EventWizard() {
   return (
     <div className="w-full max-w-2xl mx-auto py-8 px-4 selection:bg-primary/20 selection:text-primary">
       {/* Stepper Header */}
-      <div className="flex items-center justify-between mb-8 relative">
+      <div className="flex items-center justify-between mb-8 relative max-w-xs mx-auto">
         <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-border -translate-y-1/2 -z-10" />
         {steps.map((step) => {
           const isPassed = currentStep > step.num;
@@ -311,7 +445,7 @@ export function EventWizard() {
               >
                 {isPassed ? <Check className="w-4 h-4" /> : step.num}
               </div>
-              <span className={`text-[11px] font-mono uppercase tracking-wider mt-2 hidden sm:block ${isCurrent ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+              <span className={`text-[11px] font-mono uppercase tracking-wider mt-2 ${isCurrent ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
                 {step.label}
               </span>
             </div>
@@ -321,15 +455,19 @@ export function EventWizard() {
 
       {/* Step Container */}
       <div className="bg-card rounded-3xl p-6 sm:p-10 border border-border/80 shadow-xs ring-1 ring-border/30 text-foreground">
-        {/* STEP 1: Basic Information */}
+        {/* STEP 1: Details & Venue Schedule */}
         {currentStep === 1 && (
           <div className="space-y-6">
             <div className="space-y-1">
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono uppercase font-semibold bg-primary/10 text-primary border border-primary/20">
-                Step 1 of 5
+                Step 1 of 2
               </span>
-              <h2 className="font-display text-3xl font-light text-foreground tracking-tight mt-2">Event Details</h2>
-              <p className="text-xs text-muted-foreground font-light">Give your celebration a memorable name and date.</p>
+              <h2 className="font-display text-3xl font-light text-foreground tracking-tight mt-2">
+                Event & Venue Details
+              </h2>
+              <p className="text-xs text-muted-foreground font-light">
+                Provide your event information, schedule, and venue location.
+              </p>
             </div>
 
             {hasStudioPlan && (
@@ -343,7 +481,7 @@ export function EventWizard() {
                       Studio Plan Active
                     </span>
                     <p className="text-[11px] text-muted-foreground mt-0.5">
-                      Covered by your Studio plan. The standard ₱1,499 event fee is waived (₱0).
+                      Covered by your Studio plan. Standard event fees waived (₱0).
                     </p>
                   </div>
                 </div>
@@ -353,21 +491,31 @@ export function EventWizard() {
               </div>
             )}
 
-            <div className="space-y-4">
+            <div className="space-y-5">
+              {/* Event Name */}
               <div>
                 <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">
                   Event Name *
                 </label>
                 <input
+                  id="event-name-input"
                   type="text"
                   placeholder="e.g. Garcia Wedding 2026"
                   value={formData.name}
                   onChange={handleNameChange}
-                  className="w-full px-4 py-3 rounded-xl bg-secondary/50 border border-border/70 text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-sm shadow-2xs font-sans"
+                  className={`w-full px-4 py-3 rounded-xl bg-secondary/50 border text-foreground placeholder:text-muted-foreground/60 focus:outline-none text-sm shadow-2xs font-sans transition-all ${
+                    nameError
+                      ? 'border-rose-500 ring-2 ring-rose-500/20 focus:border-rose-500'
+                      : 'border-border/70 focus:border-primary focus:ring-1 focus:ring-primary'
+                  }`}
                   required
                 />
+                {nameError && (
+                  <p className="text-xs text-rose-500 mt-1.5 font-medium">{nameError}</p>
+                )}
               </div>
 
+              {/* Public Event URL */}
               <div>
                 <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">
                   Public Event URL
@@ -378,16 +526,12 @@ export function EventWizard() {
                 </div>
               </div>
 
+              {/* Event Type & Date */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground">
-                      Event Type
-                    </label>
-                    <span className="text-[10px] font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20 font-semibold">
-                      {hasStudioPlan ? 'STUDIO COVERAGE' : 'PRO & STUDIO READY'}
-                    </span>
-                  </div>
+                  <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">
+                    Event Type
+                  </label>
                   <EventTypeSelectWithPreview
                     value={formData.eventType}
                     onChange={(newType) => setFormData((prev) => ({ ...prev, eventType: newType }))}
@@ -400,7 +544,7 @@ export function EventWizard() {
 
                 <div>
                   <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">
-                    Date
+                    Date *
                   </label>
                   <input
                     type="date"
@@ -410,280 +554,182 @@ export function EventWizard() {
                   />
                 </div>
               </div>
-            </div>
 
-            <div className="pt-4 flex justify-end">
-              <button
-                type="button"
-                disabled={!formData.name.trim()}
-                onClick={() => setCurrentStep(2)}
-                className="px-6 py-2.5 rounded-full bg-primary hover:bg-primary/90 disabled:opacity-40 text-primary-foreground font-mono text-xs uppercase tracking-[0.15em] font-medium transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
-              >
-                <span>Continue to Branding</span>
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 2: Branding */}
-        {currentStep === 2 && (
-          <div className="space-y-6">
-            <div className="space-y-1">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono uppercase font-semibold bg-primary/10 text-primary border border-primary/20">
-                Step 2 of 5
-              </span>
-              <h2 className="font-display text-3xl font-light text-foreground tracking-tight mt-2">Event Palette</h2>
-              <p className="text-xs text-muted-foreground font-light">Match the photobooth colors to your event theme.</p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">
-                  Primary Accent Color
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    value={formData.primaryColor}
-                    onChange={(e) => setFormData(prev => ({ ...prev, primaryColor: e.target.value }))}
-                    className="w-12 h-12 rounded-xl bg-transparent border border-border cursor-pointer p-0.5"
-                  />
-                  <span className="text-xs font-mono text-foreground uppercase">{formData.primaryColor}</span>
+              {/* Schedule (Hours) */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-secondary/30 border border-border/60 space-y-3">
+                <span className="text-xs font-mono uppercase tracking-wider text-foreground font-semibold block">
+                  Event Schedule & Hours
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase tracking-wider text-muted-foreground mb-1.5">
+                      Start Time
+                    </label>
+                    <input
+                      type="time"
+                      value={formData.startTime}
+                      onChange={(e) => setFormData(prev => ({ ...prev, startTime: e.target.value }))}
+                      className="w-full px-4 py-2.5 rounded-xl bg-secondary/60 border border-border/70 text-foreground text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary shadow-2xs font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase tracking-wider text-muted-foreground mb-1.5">
+                      End Time
+                    </label>
+                    <input
+                      type="time"
+                      value={formData.endTime}
+                      onChange={(e) => setFormData(prev => ({ ...prev, endTime: e.target.value }))}
+                      className="w-full px-4 py-2.5 rounded-xl bg-secondary/60 border border-border/70 text-foreground text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary shadow-2xs font-mono"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">
-                  Secondary Tone
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    value={formData.secondaryColor}
-                    onChange={(e) => setFormData(prev => ({ ...prev, secondaryColor: e.target.value }))}
-                    className="w-12 h-12 rounded-xl bg-transparent border border-border cursor-pointer p-0.5"
-                  />
-                  <span className="text-xs font-mono text-foreground uppercase">{formData.secondaryColor}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-4 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setCurrentStep(1)}
-                className="px-5 py-2.5 rounded-full bg-secondary hover:bg-secondary/80 text-foreground font-mono text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                <ArrowLeft className="w-4 h-4 mr-1" />
-                Back
-              </button>
-              <button
-                type="button"
-                onClick={() => setCurrentStep(3)}
-                className="px-6 py-2.5 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-mono text-xs uppercase tracking-[0.15em] font-medium transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
-              >
-                <span>Next: Booth Rules</span>
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 3: Photobooth Rules */}
-        {currentStep === 3 && (
-          <div className="space-y-6">
-            <div className="space-y-1">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono uppercase font-semibold bg-primary/10 text-primary border border-primary/20">
-                Step 3 of 5
-              </span>
-              <h2 className="font-display text-3xl font-light text-foreground tracking-tight mt-2">Photobooth Rules</h2>
-              <p className="text-xs text-muted-foreground font-light">Control guest limits and countdown timer.</p>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">
-                  Shutter Countdown
-                </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {[0, 3, 5, 10].map((seconds) => (
-                    <button
-                      key={seconds}
-                      type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, countdown: seconds }))}
-                      className={`py-3 rounded-xl text-xs font-mono font-medium border transition-all cursor-pointer ${
-                        formData.countdown === seconds
-                          ? 'bg-primary text-primary-foreground border-primary shadow-xs font-semibold'
-                          : 'bg-secondary/50 border-border/70 text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      {seconds === 0 ? 'Off (Instant)' : `${seconds}s`}
-                    </button>
-                  ))}
+              {/* Venue & Location */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-secondary/30 border border-border/60 space-y-3">
+                <span className="text-xs font-mono uppercase tracking-wider text-foreground font-semibold block">
+                  Venue & Location
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase tracking-wider text-muted-foreground mb-1.5">
+                      Venue Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. The Glasshouse Manila"
+                      value={formData.venueName}
+                      onChange={(e) => setFormData(prev => ({ ...prev, venueName: e.target.value }))}
+                      className="w-full px-4 py-2.5 rounded-xl bg-secondary/60 border border-border/70 text-foreground placeholder:text-muted-foreground/60 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary shadow-2xs font-sans"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-mono uppercase tracking-wider text-muted-foreground mb-1.5">
+                      Address / City
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Bonifacio Global City, Taguig"
+                      value={formData.location}
+                      onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
+                      className="w-full px-4 py-2.5 rounded-xl bg-secondary/60 border border-border/70 text-foreground placeholder:text-muted-foreground/60 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary shadow-2xs font-sans"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between p-4 rounded-2xl bg-secondary/40 border border-border/60">
-                <div>
-                  <h4 className="text-sm font-semibold text-foreground">Live Event Gallery</h4>
-                  <p className="text-xs text-muted-foreground">Allow guests to view photos taken by other attendees.</p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={formData.enableGallery}
-                  onChange={(e) => setFormData(prev => ({ ...prev, enableGallery: e.target.checked }))}
-                  className="w-5 h-5 accent-primary rounded cursor-pointer"
+              {/* Optional Description / Instructions */}
+              <div>
+                <label className="block text-xs font-mono uppercase tracking-wider text-muted-foreground mb-2">
+                  Event Notes (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Additional notes or instructions for guests and booth operators..."
+                  value={formData.description}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full px-4 py-2.5 rounded-xl bg-secondary/50 border border-border/70 text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-sm shadow-2xs font-sans resize-none"
                 />
               </div>
             </div>
 
-            <div className="pt-4 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setCurrentStep(2)}
+            {/* Actions */}
+            <div className="pt-4 flex items-center justify-between border-t border-border/60">
+              <Link
+                href="/dashboard/events"
                 className="px-5 py-2.5 rounded-full bg-secondary hover:bg-secondary/80 text-foreground font-mono text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <ArrowLeft className="w-4 h-4 mr-1" />
-                Back
-              </button>
+                Cancel
+              </Link>
               <button
                 type="button"
-                onClick={() => setCurrentStep(4)}
+                onClick={handlePublishEvent}
                 className="px-6 py-2.5 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-mono text-xs uppercase tracking-[0.15em] font-medium transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
               >
-                <span>Next: Select Template</span>
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 4: Template */}
-        {currentStep === 4 && (
-          <div className="space-y-6">
-            <div className="space-y-1">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono uppercase font-semibold bg-primary/10 text-primary border border-primary/20">
-                Step 4 of 5
-              </span>
-              <h2 className="font-display text-3xl font-light text-foreground tracking-tight mt-2">Photo Strip Template</h2>
-              <p className="text-xs text-muted-foreground font-light">Choose the primary frame layout for your guests.</p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {[
-                { id: 'strip', name: 'Classic 3-Photo Strip', desc: 'Vertical photo strip with elegant text' },
-                { id: 'filmstrip', name: '35mm Filmstrip', desc: 'Vintage film strip with sprocket borders' },
-                { id: 'polaroid', name: 'Vintage Polaroid', desc: 'Square photo with generous matte border' },
-                { id: 'single', name: 'Landscape 4:3', desc: 'Full-bleed portrait with subtle subtitle overlay' },
-              ].map((t) => (
-                <div
-                  key={t.id}
-                  onClick={() => setFormData(prev => ({ ...prev, templateLayout: t.id }))}
-                  className={`p-5 rounded-2xl border cursor-pointer transition-all ${
-                    formData.templateLayout === t.id
-                      ? 'bg-primary/10 border-primary ring-2 ring-primary/20 shadow-xs'
-                      : 'bg-secondary/40 border-border/70 hover:border-border'
-                  }`}
-                >
-                  <h4 className="font-display text-lg text-foreground mb-1 font-medium">{t.name}</h4>
-                  <p className="text-xs text-muted-foreground font-light leading-relaxed">{t.desc}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="pt-4 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setCurrentStep(3)}
-                className="px-5 py-2.5 rounded-full bg-secondary hover:bg-secondary/80 text-foreground font-mono text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                <ArrowLeft className="w-4 h-4 mr-1" />
-                Back
-              </button>
-              <button 
-                type="button"
-                onClick={() => {
-                  try {
-                    const freshStatus = getUserEventLimitStatus();
-                    if (!freshStatus.allowed) {
-                      setLimitStatus(freshStatus);
-                      return;
-                    }
-
-                    const raw = localStorage.getItem('memora_events');
-                    const list = raw ? JSON.parse(raw) : [];
-                    let userPlan = 'free';
-                    let isPremium = false;
-                    let organizerEmail = '';
-                    let userId = '';
-                    let organizerName = 'Organizer';
-
-                    const storedUser = localStorage.getItem('memora_user');
-                    if (storedUser) {
-                      const u = JSON.parse(storedUser);
-                      if (u.email) organizerEmail = u.email;
-                      if (u.id) userId = u.id;
-                      if (u.name) organizerName = u.name;
-                      const isAdmin = isAdminRole(u.role) || u.role === 'admin';
-                      if (isAdmin || (u.subscription_plan === 'studio' && (u.subscription_status === 'active' || u.subscription_status === 'past_due'))) {
-                        userPlan = 'studio';
-                        isPremium = true;
-                      } else if (u.plan === 'pro' || u.subscription_plan === 'pro') {
-                        userPlan = 'pro';
-                        isPremium = true;
-                      }
-                    }
-
-                    const newEvent = {
-                      id: Date.now().toString(),
-                      name: formData.name || 'New Event',
-                      slug: formData.slug || generateEventSlug(formData.name || 'event'),
-                      eventType: formData.eventType,
-                      date: formData.date,
-                      location: formData.location || 'Private Venue',
-                      organizerName: organizerName,
-                      organizerEmail: organizerEmail,
-                      userId: userId,
-                      status: 'active',
-                      plan: userPlan,
-                      isPremium: isPremium,
-                      photoCount: 0,
-                    };
-                    list.unshift(newEvent);
-                    localStorage.setItem('memora_events', JSON.stringify(list));
-                    const { recordRealAuditLog } = require('@/lib/adminRecords');
-                    recordRealAuditLog('Event Created: ' + newEvent.name + ' [plan: ' + userPlan + ']', 'Event Organizer', 'info');
-                    const { broadcastRealtime } = require('@/lib/realtime');
-                    broadcastRealtime('EVENT_CREATED', {
-                      id: newEvent.id,
-                      name: newEvent.name,
-                      slug: newEvent.slug,
-                    });
-                    broadcastRealtime('ACTIVITY_LOGGED', {
-                      event: 'Event Published: ' + newEvent.name,
-                      actor: 'Event Organizer',
-                      severity: 'info',
-                    });
-                  } catch {}
-                  setCurrentStep(5);
-                }}
-                className="px-6 py-2.5 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-mono text-xs uppercase tracking-[0.15em] font-medium transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
-              >
-                <span>Publish Event</span>
+                <span>Publish & Get QR Code</span>
                 <Sparkles className="w-4 h-4 ml-1" />
               </button>
             </div>
           </div>
         )}
 
-        {/* STEP 5: Publish & QR Code */}
-        {currentStep === 5 && (
-          <div className="space-y-6">
+        {/* STEP 2: Live Booth & QR Code */}
+        {currentStep === 2 && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <div className="space-y-1 text-center">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono uppercase font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+                Ready for Guests
+              </span>
+              <h2 className="font-display text-3xl font-light text-foreground tracking-tight mt-2">
+                Event Published
+              </h2>
+              <p className="text-xs text-muted-foreground font-light max-w-md mx-auto">
+                Your photobooth is active. Guests can scan the QR code to capture and view photos.
+              </p>
+            </div>
+
             <QrShareCard
               eventName={formData.name || 'New Event'}
               eventSlug={formData.slug || generateEventSlug(formData.name || 'event')}
             />
+
+            {/* Summary Details */}
+            <div className="p-4 rounded-2xl bg-secondary/40 border border-border/70 max-w-sm mx-auto text-left space-y-2 text-xs">
+              <div className="flex items-center justify-between font-mono text-muted-foreground text-[11px]">
+                <span>Date & Schedule</span>
+                <span className="text-foreground font-medium">
+                  {formData.date} • {formData.startTime} – {formData.endTime}
+                </span>
+              </div>
+              {(formData.venueName || formData.location) && (
+                <div className="flex items-center justify-between font-mono text-muted-foreground text-[11px]">
+                  <span>Venue</span>
+                  <span className="text-foreground font-medium truncate max-w-[190px]">
+                    {formData.venueName
+                      ? `${formData.venueName}${formData.location ? ` (${formData.location})` : ''}`
+                      : formData.location}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Link
+                href="/dashboard/events"
+                className="w-full sm:w-auto px-6 py-2.5 rounded-full bg-secondary hover:bg-secondary/80 text-foreground font-mono text-xs uppercase tracking-wider transition-all text-center"
+              >
+                Go to Events Dashboard
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setFormData({
+                    name: '',
+                    slug: '',
+                    eventType: 'wedding' as EventType,
+                    date: new Date().toISOString().split('T')[0],
+                    startTime: '18:00',
+                    endTime: '23:00',
+                    venueName: '',
+                    location: '',
+                    description: '',
+                    primaryColor: '#e6c687',
+                    secondaryColor: '#faf6ee',
+                    countdown: 3,
+                    maxPhotosPerGuest: hasStudioPlan ? 9999 : 10,
+                    enableGallery: true,
+                    watermark: !hasStudioPlan,
+                    templateLayout: 'strip',
+                  });
+                  setCurrentStep(1);
+                }}
+                className="w-full sm:w-auto px-6 py-2.5 rounded-full bg-card hover:bg-secondary/60 border border-border text-foreground font-mono text-xs uppercase tracking-wider transition-all text-center cursor-pointer"
+              >
+                Create Another Event
+              </button>
+            </div>
           </div>
         )}
       </div>

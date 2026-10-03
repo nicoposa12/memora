@@ -53,19 +53,21 @@ export interface ExpirationCountdownInfo {
 }
 
 export function getExpirationCountdown(cust: RealCustomerRecord): ExpirationCountdownInfo {
+  // Free Trial never has an expiration date or renewal countdown
+  if (cust.tier === 'Free Trial' || (!cust.tier?.includes('Studio') && !cust.tier?.includes('Pro') && !cust.tier?.includes('Event Pass'))) {
+    return {
+      daysLeft: 0,
+      label: 'Trial Account',
+      status: 'no_expiration',
+      badgeClass: 'bg-secondary text-foreground/80 border border-border/80 font-medium',
+      barColor: 'bg-muted-foreground/30',
+      dotColor: 'bg-muted-foreground',
+      progressPercent: 100,
+    };
+  }
+
   let expiresAt = cust.subscriptionExpiresAt;
   if (!expiresAt) {
-    if (cust.tier === 'Free Trial') {
-      return {
-        daysLeft: 0,
-        label: 'Trial Account',
-        status: 'no_expiration',
-        badgeClass: 'bg-secondary text-foreground/80 border border-border/80 font-medium',
-        barColor: 'bg-muted-foreground/30',
-        dotColor: 'bg-muted-foreground',
-        progressPercent: 100,
-      };
-    }
     // For Event Pass (PRO) or Studio Pro missing expiresAt, compute 30 days from joinedDate
     const joined = new Date(cust.joinedDate);
     const target = isNaN(joined.getTime()) ? new Date() : joined;
@@ -273,7 +275,8 @@ export default function AdminUsersPage() {
         apiClient.put(`/admin/users/${numericId}`, {
           subscription_plan: planCode,
           subscription_status: 'active',
-          subscription_expires_at: expiresAt,
+          subscription_expires_at: expiresAt || null,
+          subscription_grace_until: null,
         }).catch(() => {});
       } catch {}
     }
@@ -423,6 +426,9 @@ export default function AdminUsersPage() {
       d.setDate(d.getDate() + 30);
       expiresAt = d.toISOString().split('T')[0];
     }
+    if (editTier === 'Free Trial') {
+      expiresAt = undefined;
+    }
 
     const updates: Partial<RealCustomerRecord> = {
       tier: editTier,
@@ -444,7 +450,8 @@ export default function AdminUsersPage() {
           name: updates.name,
           subscription_plan: planCode,
           subscription_status: editStatus,
-          subscription_expires_at: expiresAt,
+          subscription_expires_at: expiresAt || null,
+          subscription_grace_until: null,
         }).catch(() => {});
       } catch {}
     }
@@ -943,7 +950,7 @@ export default function AdminUsersPage() {
                       {/* Plan Lifecycle & Countdown */}
                       <td className="py-4 px-4">
                         <div className="space-y-2 min-w-[220px]">
-                          {cust.subscriptionExpiresAt || isPro || isStudio ? (
+                          {(isPro || isStudio) && (cust.subscriptionExpiresAt || cust.joinedDate) ? (
                             <>
                               {/* Top row: Renewal Date + High-Visibility Badge */}
                               <div className="flex items-center justify-between gap-2.5">

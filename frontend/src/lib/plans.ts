@@ -32,7 +32,7 @@ export interface PlanConfig {
   gifExport?: boolean; // true = animated GIF strip generation & export enabled, false = disabled
 }
 
-export const ALL_EVENT_TYPE_IDS = ['school', 'beach', 'party', 'wedding', 'birthday', 'graduation', 'corporate'];
+export const ALL_EVENT_TYPE_IDS = ['school', 'beach', 'party', 'wedding', 'birthday', 'graduation', 'corporate', 'debut', 'other'];
 
 export interface AvailableTemplateOption {
   id: string;
@@ -249,6 +249,26 @@ export const PRO_EVENT_THEME_TEMPLATES: Record<string, AvailableTemplateOption> 
     description: 'Midnight navy frame with gilded graduation caps, diploma footer, and honor trophy',
     category: 'graduation_event',
   },
+  debut: {
+    id: 'event_debut',
+    name: 'Pro Event – Debut',
+    badge: 'PRO Pass',
+    layout: '4-Pose Strip',
+    frameColor: '#fff5f7',
+    textColor: '#831843',
+    description: 'Grand 18th debutante celebration with rose florals, tiara crowns, and champagne accents',
+    category: 'debut_event',
+  },
+  other: {
+    id: 'event_party',
+    name: 'Pro Event – Celebration',
+    badge: 'PRO Pass',
+    layout: '3-Photo Strip',
+    frameColor: '#0f1117',
+    textColor: '#f4f4f5',
+    description: 'Universal celebration strip with sparkling lights, disco ball, and festive accents',
+    category: 'party_event',
+  },
 };
 
 export const ALL_PRO_EVENT_TEMPLATES = Object.values(PRO_EVENT_THEME_TEMPLATES);
@@ -344,6 +364,7 @@ export function getTemplateNativeLayoutId(layoutStr?: string, templateId?: strin
       event_beach: 'strip3',
       event_corporate: 'strip4',
       event_graduation: 'strip4',
+      event_debut: 'strip4',
       classic_filmstrip: 'filmstrip',
       marais_darkroom: 'filmstrip',
       marais_analog: 'filmstrip',

@@ -216,11 +216,16 @@ export function AdminSidebar({ onCloseMobile }: AdminSidebarProps) {
               SA
             </div>
             <div className="min-w-0">
-              <span className="block text-xs font-semibold text-foreground truncate">
-                {adminName}
-              </span>
-              <span className="block text-[10px] text-primary truncate font-medium">
-                Administrator
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="block text-xs font-semibold text-foreground truncate">
+                  {adminName}
+                </span>
+                <span className="px-1.5 py-0.5 rounded text-[8.5px] font-mono font-bold uppercase tracking-wider shrink-0 border leading-none bg-primary/15 text-primary border-primary/30 select-none">
+                  Admin
+                </span>
+              </div>
+              <span className="block text-[10px] text-muted-foreground truncate font-mono">
+                {adminEmail || 'Administrator'}
               </span>
             </div>
           </div>

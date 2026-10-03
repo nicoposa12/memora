@@ -2414,19 +2414,6 @@ export default function AdminPlansPage() {
                                       : currentEventPalette.slots[pIdx % currentEventPalette.slots.length]}
                                   </span>
                                 </div>
-                                {!isSchoolTheme && (
-                                  <span
-                                    className="absolute bottom-0.5 right-0.5 text-[5px] font-mono px-1 rounded font-semibold"
-                                    style={{
-                                      backgroundColor: previewMode === 'template'
-                                        ? (isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.1)')
-                                        : `${currentEventPalette.accentColor}18`,
-                                      color: stripTextColor,
-                                    }}
-                                  >
-                                    {previewMode === 'template' ? `0${pIdx + 1}A` : `${getEventBareLabel(previewEventType).slice(0, 3).toUpperCase()}-0${pIdx + 1}`}
-                                  </span>
-                                )}
                               </div>
                             ))}
                           </div>
@@ -2696,21 +2683,6 @@ export default function AdminPlansPage() {
                                 {/* Graduation Celebration Embellishments: 12 elements (cap, trophy, diploma, medal, stars, sparkles, books, confetti, badge, tassel, pen, celebration) */}
                                 {isGraduationTheme && (
                                   <GraduationPhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
-                                )}
-
-                                {/* Frame Numbering */}
-                                {!isSchoolTheme && (
-                                  <span
-                                    className="absolute bottom-0.5 right-1 text-[5.5px] font-mono px-1 py-0.2 rounded font-semibold"
-                                    style={{
-                                      backgroundColor: previewMode === 'template'
-                                        ? (isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.1)')
-                                        : `${currentEventPalette.accentColor}18`,
-                                      color: stripTextColor,
-                                    }}
-                                  >
-                                    {previewMode === 'template' ? `0${pIdx + 1}A` : isBirthdayTheme ? `BIR-0${pIdx + 1}` : isCorporateTheme ? `COR-0${pIdx + 1}` : isGraduationTheme ? `GRA-0${pIdx + 1}` : `${getEventBareLabel(previewEventType).slice(0, 3).toUpperCase()}-0${pIdx + 1}`}
-                                  </span>
                                 )}
                               </div>
                             </React.Fragment>

@@ -79,7 +79,21 @@ class UserAdminController extends Controller
             'subscription_grace_until' => ['nullable', 'date'],
         ]);
 
-        $user->update(array_filter($validated, fn($v) => !is_null($v)));
+        // If plan is free or none, clear subscription expiration and grace periods
+        if (isset($validated['subscription_plan']) && in_array($validated['subscription_plan'], ['none', 'free'])) {
+            $validated['subscription_expires_at'] = null;
+            $validated['subscription_grace_until'] = null;
+        }
+
+        // Only update fields that were actually passed in the request
+        $fieldsToUpdate = [];
+        foreach ($validated as $key => $value) {
+            if ($request->exists($key) || array_key_exists($key, $validated)) {
+                $fieldsToUpdate[$key] = $value;
+            }
+        }
+
+        $user->update($fieldsToUpdate);
 
         // Revoke active sessions immediately if account is suspended
         if (($validated['subscription_status'] ?? '') === 'suspended') {
