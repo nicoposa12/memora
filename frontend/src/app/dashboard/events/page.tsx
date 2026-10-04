@@ -29,14 +29,19 @@ import { broadcastRealtime } from '@/lib/realtime';
 import { useModal } from '@/context/ModalContext';
 import { apiClient } from '@/lib/api';
 import { getEventEmoji, getEventLabel, EVENT_TYPES_LIST } from '@/types';
-import { getScopedEvents, deleteStoredEvent, updateStoredEvent, getCurrentUser, getUserEventLimitStatus, isEventOwner, EventLimitStatus } from '@/lib/userEvents';
+import { getScopedEvents, deleteStoredEvent, updateStoredEvent, getCurrentUser, getUserEventLimitStatus, isEventOwner, EventLimitStatus, isAdminRecord } from '@/lib/userEvents';
 
 interface PhotoboothEvent {
   id: string;
   name: string;
   slug: string;
   date: string;
+  startTime?: string;
+  endTime?: string;
+  venueName?: string;
+  venueLocation?: string;
   venue: string;
+  description?: string;
   themeColor: string;
   status: 'active' | 'archived' | 'draft';
   plan: 'free' | 'pro' | 'studio';
@@ -47,6 +52,42 @@ interface PhotoboothEvent {
   activeGuests: number;
   allowGuestUploads: boolean;
   publicGallery: boolean;
+}
+
+function parseVenueDetails(e: any): { venueName: string; venueLocation: string; venueDisplay: string } {
+  let vName = (e.venueName || '').trim();
+  let vLoc = (e.venueLocation || e.address || '').trim();
+
+  if (!vName && e.location) {
+    const locStr = String(e.location).trim();
+    if (locStr.includes(' • ')) {
+      const parts = locStr.split(' • ');
+      vName = parts[0].trim();
+      vLoc = parts.slice(1).join(' • ').trim();
+    } else {
+      vName = locStr;
+    }
+  }
+
+  const vDisplay = vName
+    ? (vLoc ? `${vName} • ${vLoc}` : vName)
+    : (vLoc || e.venue || e.location || 'Private Venue');
+
+  return {
+    venueName: vName,
+    venueLocation: vLoc,
+    venueDisplay: vDisplay,
+  };
+}
+
+function toValidDateInput(val?: string): string {
+  if (!val) return new Date().toISOString().split('T')[0];
+  if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+  const parsed = Date.parse(val);
+  if (!isNaN(parsed)) {
+    return new Date(parsed).toISOString().split('T')[0];
+  }
+  return new Date().toISOString().split('T')[0];
 }
 
 export default function EventOrganizerEventsPage() {
@@ -61,7 +102,10 @@ export default function EventOrganizerEventsPage() {
   const [selectedQrEvent, setSelectedQrEvent] = useState<{ name: string; slug: string } | null>(null);
   const [editingEvent, setEditingEvent] = useState<PhotoboothEvent | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(() => {
+    const u = getCurrentUser();
+    return Boolean(u && (isAdminRole(u.role) || u.role === 'admin' || isAdminRecord(u)));
+  });
   const [limitStatus, setLimitStatus] = useState<EventLimitStatus | null>(null);
 
   const loadEventsData = React.useCallback(async () => {
@@ -70,7 +114,7 @@ export default function EventOrganizerEventsPage() {
       const token = typeof window !== 'undefined' ? localStorage.getItem('memora_token') : null;
 
       if (u) {
-        const adminUser = isAdminRole(u.role) || u.role === 'admin';
+        const adminUser = Boolean(isAdminRole(u.role) || u.role === 'admin' || isAdminRecord(u));
         setIsAdmin(adminUser);
         if (adminUser || u.subscription_plan === 'studio') {
           setStudioPlan('studio');
@@ -85,23 +129,31 @@ export default function EventOrganizerEventsPage() {
       // Initial fast render from local cache
       const userScoped = getScopedEvents(u);
       if (Array.isArray(userScoped) && userScoped.length > 0) {
-        const mapped: PhotoboothEvent[] = userScoped.map((e: any, idx: number) => ({
-          id: String(e.id || `EVT-USR-${idx}`),
-          name: e.name || 'Custom Event',
-          slug: e.slug || 'custom-event',
-          date: e.date || 'Upcoming',
-          venue: e.location || 'Private Venue',
-          eventType: e.eventType || 'wedding',
-          themeColor: e.primaryColor || '#d8b86a',
-          status: e.status || 'active',
-          plan: e.plan || (e.isPremium ? 'pro' : 'free'),
-          price: e.plan === 'pro' || e.isPremium ? '₱1,499' : '₱0',
-          paymentStatus: e.plan === 'pro' || e.isPremium ? 'PAID' : 'UNPAID',
-          photosCount: e.photoCount || e.photosCount || 0,
-          activeGuests: e.activeGuests || 0,
-          allowGuestUploads: true,
-          publicGallery: true,
-        }));
+        const mapped: PhotoboothEvent[] = userScoped.map((e: any, idx: number) => {
+          const { venueName, venueLocation, venueDisplay } = parseVenueDetails(e);
+          return {
+            id: String(e.id || `EVT-USR-${idx}`),
+            name: e.name || 'Custom Event',
+            slug: e.slug || 'custom-event',
+            date: e.date || e.event_date || new Date().toISOString().split('T')[0],
+            startTime: e.startTime || '18:00',
+            endTime: e.endTime || '23:00',
+            venueName,
+            venueLocation,
+            venue: venueDisplay,
+            description: e.description || '',
+            eventType: e.eventType || e.event_type || 'wedding',
+            themeColor: e.primaryColor || e.themeColor || e.settings?.primary_color || '#e6c687',
+            status: e.status || 'active',
+            plan: e.plan || (e.isPremium ? 'pro' : 'free'),
+            price: e.plan === 'pro' || e.isPremium ? '₱1,499' : '₱0',
+            paymentStatus: e.plan === 'pro' || e.isPremium ? 'PAID' : 'UNPAID',
+            photosCount: e.photoCount || e.photosCount || 0,
+            activeGuests: e.activeGuests || 0,
+            allowGuestUploads: e.allowGuestUploads ?? true,
+            publicGallery: e.enableGallery ?? e.publicGallery ?? true,
+          };
+        });
         setEvents(mapped);
       } else {
         setEvents([]);
@@ -145,23 +197,34 @@ export default function EventOrganizerEventsPage() {
           }
 
           if (rawDbEvents.length > 0) {
-            const dbMapped: PhotoboothEvent[] = rawDbEvents.map((e: any) => ({
-              id: String(e.id),
-              name: e.name || 'Custom Event',
-              slug: e.slug || 'custom-event',
-              date: e.event_date || e.date || 'Upcoming',
-              venue: e.location || 'Private Venue',
-              eventType: e.event_type || e.eventType || 'wedding',
-              themeColor: e.settings?.primary_color || e.primaryColor || '#e6c687',
-              status: e.status || 'active',
-              plan: e.plan || (e.is_premium ? 'pro' : 'free'),
-              price: e.plan === 'pro' || e.is_premium ? '₱1,499' : '₱0',
-              paymentStatus: e.plan === 'pro' || e.is_premium ? 'PAID' : 'UNPAID',
-              photosCount: e.photos_count ?? e.photoCount ?? 0,
-              activeGuests: e.activeGuests || 0,
-              allowGuestUploads: true,
-              publicGallery: e.settings?.enable_gallery ?? true,
-            }));
+            const dbMapped: PhotoboothEvent[] = rawDbEvents.map((e: any) => {
+              const localMatch = localEvents.find((le: any) => String(le.id) === String(e.id) || le.slug === e.slug);
+              const merged = { ...localMatch, ...e };
+              const { venueName, venueLocation, venueDisplay } = parseVenueDetails(merged);
+
+              return {
+                id: String(e.id),
+                name: e.name || 'Custom Event',
+                slug: e.slug || 'custom-event',
+                date: e.event_date || localMatch?.date || new Date().toISOString().split('T')[0],
+                startTime: localMatch?.startTime || '18:00',
+                endTime: localMatch?.endTime || '23:00',
+                venueName,
+                venueLocation,
+                venue: venueDisplay,
+                description: e.description || localMatch?.description || '',
+                eventType: e.event_type || localMatch?.eventType || 'wedding',
+                themeColor: e.settings?.primary_color || localMatch?.primaryColor || '#e6c687',
+                status: e.status || 'active',
+                plan: e.plan || (e.is_premium ? 'pro' : 'free'),
+                price: e.plan === 'pro' || e.is_premium ? '₱1,499' : '₱0',
+                paymentStatus: e.plan === 'pro' || e.is_premium ? 'PAID' : 'UNPAID',
+                photosCount: e.photos_count ?? localMatch?.photoCount ?? 0,
+                activeGuests: e.activeGuests || localMatch?.activeGuests || 0,
+                allowGuestUploads: localMatch?.allowGuestUploads ?? true,
+                publicGallery: e.settings?.enable_gallery ?? localMatch?.publicGallery ?? true,
+              };
+            });
 
             setEvents(dbMapped);
 
@@ -170,25 +233,34 @@ export default function EventOrganizerEventsPage() {
             const parsedStored = rawStored ? JSON.parse(rawStored) : [];
             const nonUserEvents = parsedStored.filter((item: any) => !isEventOwner(item, u));
             const updatedCache = [
-              ...rawDbEvents.map((dbe: any) => ({
-                id: String(dbe.id),
-                name: dbe.name,
-                slug: dbe.slug,
-                eventType: dbe.event_type,
-                date: dbe.event_date,
-                location: dbe.location,
-                description: dbe.description,
-                status: dbe.status,
-                plan: dbe.plan,
-                isPremium: dbe.is_premium,
-                primaryColor: dbe.settings?.primary_color || '#e6c687',
-                secondaryColor: dbe.settings?.secondary_color || '#faf6ee',
-                countdown: dbe.settings?.countdown_seconds ?? 3,
-                enableGallery: dbe.settings?.enable_gallery ?? true,
-                photoCount: dbe.photos_count ?? 0,
-                organizerEmail: u?.email,
-                userId: u?.id,
-              })),
+              ...rawDbEvents.map((dbe: any) => {
+                const localMatch = parsedStored.find((item: any) => String(item.id) === String(dbe.id) || item.slug === dbe.slug);
+                const merged = { ...localMatch, ...dbe };
+                const { venueName, venueLocation, venueDisplay } = parseVenueDetails(merged);
+                return {
+                  id: String(dbe.id),
+                  name: dbe.name,
+                  slug: dbe.slug,
+                  eventType: dbe.event_type,
+                  date: dbe.event_date || localMatch?.date,
+                  startTime: localMatch?.startTime || '18:00',
+                  endTime: localMatch?.endTime || '23:00',
+                  venueName,
+                  venueLocation,
+                  location: venueDisplay,
+                  description: dbe.description || localMatch?.description || '',
+                  status: dbe.status,
+                  plan: dbe.plan,
+                  isPremium: dbe.is_premium,
+                  primaryColor: dbe.settings?.primary_color || localMatch?.primaryColor || '#e6c687',
+                  secondaryColor: dbe.settings?.secondary_color || localMatch?.secondaryColor || '#faf6ee',
+                  countdown: dbe.settings?.countdown_seconds ?? (localMatch?.countdown ?? 3),
+                  enableGallery: dbe.settings?.enable_gallery ?? (localMatch?.enableGallery ?? true),
+                  photoCount: dbe.photos_count ?? (localMatch?.photoCount ?? 0),
+                  organizerEmail: u?.email,
+                  userId: u?.id,
+                };
+              }),
               ...nonUserEvents,
             ];
             localStorage.setItem('memora_events', JSON.stringify(updatedCache));
@@ -221,14 +293,22 @@ export default function EventOrganizerEventsPage() {
   };
 
   const handleToggleArchive = async (id: string) => {
+    if (!isAdmin) {
+      showToast('Only administrators are authorized to archive events.');
+      return;
+    }
+
     const target = events.find(e => e.id === id);
     const newStatus = target?.status === 'active' ? 'archived' : 'active';
 
     if (typeof window !== 'undefined' && localStorage.getItem('memora_token') && !id.startsWith('EVT-USR-')) {
       try {
         await apiClient.put(`/events/${id}`, { status: newStatus });
-      } catch (err) {
+      } catch (err: any) {
         console.warn('Backend archive sync failed:', err);
+        const errMsg = err?.response?.data?.message || 'Failed to update event status.';
+        showToast(errMsg);
+        return;
       }
     }
 
@@ -245,6 +325,11 @@ export default function EventOrganizerEventsPage() {
   };
 
   const handleDeleteEvent = async (id: string) => {
+    if (!isAdmin) {
+      showToast('Only administrators are authorized to delete events.');
+      return;
+    }
+
     const targetEvent = events.find(e => e.id === id);
     const confirmed = await confirmModal({
       title: 'Delete Event',
@@ -259,8 +344,11 @@ export default function EventOrganizerEventsPage() {
       if (typeof window !== 'undefined' && localStorage.getItem('memora_token') && !id.startsWith('EVT-USR-')) {
         try {
           await apiClient.delete(`/events/${id}`);
-        } catch (err) {
+        } catch (err: any) {
           console.warn('Backend delete sync failed:', err);
+          const errMsg = err?.response?.data?.message || 'Failed to delete event.';
+          showToast(errMsg);
+          return;
         }
       }
       deleteStoredEvent(id);
@@ -270,38 +358,87 @@ export default function EventOrganizerEventsPage() {
     }
   };
 
+  const openEditModal = (event: PhotoboothEvent) => {
+    const { venueName, venueLocation, venueDisplay } = parseVenueDetails(event);
+    setEditingEvent({
+      ...event,
+      name: event.name || '',
+      slug: event.slug || '',
+      venueName: event.venueName || venueName,
+      venueLocation: event.venueLocation || venueLocation,
+      venue: venueDisplay,
+      date: toValidDateInput(event.date),
+      startTime: event.startTime || '18:00',
+      endTime: event.endTime || '23:00',
+      description: event.description || '',
+      themeColor: (event.themeColor || '#e6c687').toUpperCase(),
+    });
+  };
+
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingEvent) return;
+
+    const venueName = (editingEvent.venueName || '').trim();
+    const venueLocation = (editingEvent.venueLocation || '').trim();
+    const venueDisplay = venueName
+      ? (venueLocation ? `${venueName} • ${venueLocation}` : venueName)
+      : (venueLocation || editingEvent.venue || 'Private Venue');
+
+    const cleanDate = editingEvent.date || new Date().toISOString().split('T')[0];
+    let cleanPrimaryColor = (editingEvent.themeColor || '#e6c687').trim().toUpperCase();
+    if (!cleanPrimaryColor.startsWith('#')) {
+      cleanPrimaryColor = `#${cleanPrimaryColor}`;
+    }
 
     if (typeof window !== 'undefined' && localStorage.getItem('memora_token') && !editingEvent.id.startsWith('EVT-USR-')) {
       try {
         await apiClient.put(`/events/${editingEvent.id}`, {
           name: editingEvent.name,
-          location: editingEvent.venue,
-          event_date: editingEvent.date,
+          slug: editingEvent.slug,
+          location: venueDisplay,
+          event_date: cleanDate,
           event_type: editingEvent.eventType,
-          status: editingEvent.status,
+          description: editingEvent.description || '',
           settings: {
-            primary_color: editingEvent.themeColor,
+            primary_color: cleanPrimaryColor,
+            enable_gallery: editingEvent.publicGallery,
           },
         });
-      } catch (err) {
+      } catch (err: any) {
         console.warn('Backend edit sync failed:', err);
       }
     }
 
+    const updatedEventObj: PhotoboothEvent = {
+      ...editingEvent,
+      venueName,
+      venueLocation,
+      venue: venueDisplay,
+      date: cleanDate,
+      themeColor: cleanPrimaryColor,
+    };
+
     updateStoredEvent({
       id: editingEvent.id,
       name: editingEvent.name,
-      location: editingEvent.venue,
-      date: editingEvent.date,
+      slug: editingEvent.slug,
+      venueName,
+      venueLocation,
+      location: venueDisplay,
+      date: cleanDate,
+      startTime: editingEvent.startTime || '18:00',
+      endTime: editingEvent.endTime || '23:00',
+      description: editingEvent.description || '',
       eventType: editingEvent.eventType,
-      themeColor: editingEvent.themeColor,
-      status: editingEvent.status,
+      primaryColor: cleanPrimaryColor,
+      themeColor: cleanPrimaryColor,
+      enableGallery: editingEvent.publicGallery,
+      allowGuestUploads: editingEvent.allowGuestUploads,
     });
-    setEvents(prev => prev.map(item => item.id === editingEvent.id ? editingEvent : item));
-    broadcastRealtime('EVENT_UPDATED', editingEvent);
+
+    setEvents(prev => prev.map(item => item.id === editingEvent.id ? updatedEventObj : item));
+    broadcastRealtime('EVENT_UPDATED', updatedEventObj);
     setEditingEvent(null);
     showToast(`Updated "${editingEvent.name}" settings.`);
   };
@@ -497,7 +634,6 @@ export default function EventOrganizerEventsPage() {
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="w-2.5 h-2.5 rounded-full shadow-2xs ring-1 ring-border/50" style={{ backgroundColor: event.themeColor }} title="Branding Theme Color" />
                     <span className="text-[11px] font-mono text-muted-foreground">{event.date}</span>
                   </div>
                 </div>
@@ -595,30 +731,34 @@ export default function EventOrganizerEventsPage() {
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => setEditingEvent(event)}
+                      onClick={() => openEditModal(event)}
                       className="p-1.5 rounded-lg text-muted-foreground/70 hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
                       title="Customize Theme & Settings"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => handleToggleArchive(event.id)}
-                      className="p-1.5 rounded-lg text-muted-foreground/70 hover:text-amber-600 hover:bg-secondary transition-colors cursor-pointer"
-                      title={event.status === 'active' ? 'Archive Event' : 'Unarchive Event'}
-                    >
-                      <Archive className="w-3.5 h-3.5" />
-                    </button>
+                    {isAdmin && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleArchive(event.id)}
+                          className="p-1.5 rounded-lg text-muted-foreground/70 hover:text-amber-600 hover:bg-secondary transition-colors cursor-pointer"
+                          title={event.status === 'active' ? 'Archive Event' : 'Unarchive Event'}
+                        >
+                          <Archive className="w-3.5 h-3.5" />
+                        </button>
 
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteEvent(event.id)}
-                      className="p-1.5 rounded-lg text-muted-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
-                      title="Delete Event"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteEvent(event.id)}
+                          className="p-1.5 rounded-lg text-muted-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                          title="Delete Event"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -651,10 +791,16 @@ export default function EventOrganizerEventsPage() {
       {/* Edit Event Customization Modal */}
       {editingEvent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-card border border-border/80 rounded-3xl p-6 sm:p-7 max-w-md w-full space-y-5 shadow-2xl text-foreground relative">
-            <div className="flex items-center justify-between border-b border-border/60 pb-3">
-              <h3 className="font-display text-2xl font-light text-foreground">Customize Event</h3>
+          <div className="bg-white dark:bg-card border border-border/80 rounded-3xl p-6 sm:p-7 max-w-xl w-full max-h-[92vh] overflow-y-auto space-y-5 shadow-2xl text-foreground relative">
+            <div className="flex items-center justify-between border-b border-border/60 pb-3 sticky -top-6 -mt-6 pt-6 bg-white dark:bg-card z-10">
+              <div>
+                <h3 className="font-display text-2xl font-light text-foreground">Edit Event Details</h3>
+                <p className="text-xs text-muted-foreground font-light mt-0.5">
+                  Update event schedule, venue location, and guest settings.
+                </p>
+              </div>
               <button 
+                type="button"
                 onClick={() => setEditingEvent(null)}
                 className="w-7 h-7 rounded-full bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground flex items-center justify-center text-xs font-mono cursor-pointer transition-colors"
                 aria-label="Close"
@@ -664,67 +810,141 @@ export default function EventOrganizerEventsPage() {
             </div>
 
             <form onSubmit={handleSaveEdit} className="space-y-4 text-xs font-mono">
+              {/* Event Name */}
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-muted-foreground block mb-1 font-medium">Event Name</label>
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground block mb-1 font-medium">Event Name *</label>
                 <input
                   type="text"
                   required
+                  placeholder="e.g. Garcia Wedding 2026"
                   value={editingEvent.name}
                   onChange={(e) => setEditingEvent({ ...editingEvent, name: e.target.value })}
                   className="w-full px-3.5 py-2.5 bg-secondary/50 border border-border/70 rounded-xl text-foreground font-sans focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground shadow-2xs"
                 />
               </div>
 
+              {/* Public Event URL */}
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-muted-foreground block mb-1 font-medium">Venue Location</label>
-                <input
-                  type="text"
-                  required
-                  value={editingEvent.venue}
-                  onChange={(e) => setEditingEvent({ ...editingEvent, venue: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-secondary/50 border border-border/70 rounded-xl text-foreground font-sans focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground shadow-2xs"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] uppercase tracking-wider text-muted-foreground block mb-1 font-medium">Event Type</label>
-                <select
-                  value={editingEvent.eventType || 'other'}
-                  onChange={(e) => setEditingEvent({ ...editingEvent, eventType: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-secondary/50 border border-border/70 rounded-xl text-foreground font-sans focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground shadow-2xs cursor-pointer"
-                >
-                  {EVENT_TYPES_LIST.map((et) => (
-                    <option key={et.id} value={et.id} className="bg-card text-foreground">
-                      {et.emoji} {et.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground block mb-1 font-medium">Event Date</label>
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground block mb-1 font-medium">Public Event URL</label>
+                <div className="flex items-center px-3.5 py-2.5 bg-secondary/40 border border-border/60 rounded-xl text-muted-foreground text-xs font-mono">
+                  <span className="select-none">memora.app/e/</span>
                   <input
                     type="text"
-                    value={editingEvent.date}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, date: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-secondary/50 border border-border/70 rounded-xl text-foreground focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground shadow-2xs"
+                    value={editingEvent.slug}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') })}
+                    className="flex-1 bg-transparent text-primary font-semibold focus:outline-none pl-1"
+                    placeholder="your-event-slug"
                   />
                 </div>
+              </div>
+
+              {/* Event Type & Date */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground block mb-1 font-medium">Branding Color</label>
-                  <div className="flex items-center gap-2 pt-1">
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground block mb-1 font-medium">Event Type</label>
+                  <select
+                    value={editingEvent.eventType || 'other'}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, eventType: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-secondary/50 border border-border/70 rounded-xl text-foreground font-sans focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground shadow-2xs cursor-pointer"
+                  >
+                    {EVENT_TYPES_LIST.map((et) => (
+                      <option key={et.id} value={et.id} className="bg-card text-foreground">
+                        {et.emoji} {et.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] uppercase tracking-wider text-muted-foreground block mb-1 font-medium">Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={editingEvent.date}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, date: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-secondary/50 border border-border/70 rounded-xl text-foreground focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground shadow-2xs font-mono cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* Schedule (Hours) */}
+              <div className="p-3.5 rounded-2xl bg-secondary/30 border border-border/60 space-y-2.5">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-foreground font-semibold block">
+                  Event Schedule & Hours
+                </span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[9px] font-mono uppercase tracking-wider text-muted-foreground mb-1">
+                      Start Time
+                    </label>
                     <input
-                      type="color"
-                      value={editingEvent.themeColor}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, themeColor: e.target.value })}
-                      className="w-9 h-9 rounded-xl border border-border/70 bg-transparent cursor-pointer p-0.5"
+                      type="time"
+                      value={editingEvent.startTime || '18:00'}
+                      onChange={(e) => setEditingEvent({ ...editingEvent, startTime: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-secondary/60 border border-border/70 text-foreground text-xs focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground shadow-2xs font-mono"
                     />
-                    <span className="text-muted-foreground uppercase">{editingEvent.themeColor}</span>
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-mono uppercase tracking-wider text-muted-foreground mb-1">
+                      End Time
+                    </label>
+                    <input
+                      type="time"
+                      value={editingEvent.endTime || '23:00'}
+                      onChange={(e) => setEditingEvent({ ...editingEvent, endTime: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-secondary/60 border border-border/70 text-foreground text-xs focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground shadow-2xs font-mono"
+                    />
                   </div>
                 </div>
               </div>
 
+              {/* Venue & Location */}
+              <div className="p-3.5 rounded-2xl bg-secondary/30 border border-border/60 space-y-2.5">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-foreground font-semibold block">
+                  Venue & Location
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[9px] font-mono uppercase tracking-wider text-muted-foreground mb-1">
+                      Venue Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. The Glasshouse Manila"
+                      value={editingEvent.venueName || ''}
+                      onChange={(e) => setEditingEvent({ ...editingEvent, venueName: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-secondary/60 border border-border/70 text-foreground placeholder:text-muted-foreground/60 text-xs focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground shadow-2xs font-sans"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-mono uppercase tracking-wider text-muted-foreground mb-1">
+                      Address / City
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Bonifacio Global City, Taguig"
+                      value={editingEvent.venueLocation || ''}
+                      onChange={(e) => setEditingEvent({ ...editingEvent, venueLocation: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-secondary/60 border border-border/70 text-foreground placeholder:text-muted-foreground/60 text-xs focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground shadow-2xs font-sans"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Event Notes */}
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-muted-foreground block mb-1 font-medium">Event Notes (Optional)</label>
+                <textarea
+                  rows={2}
+                  placeholder="Additional notes or instructions for guests and booth operators..."
+                  value={editingEvent.description || ''}
+                  onChange={(e) => setEditingEvent({ ...editingEvent, description: e.target.value })}
+                  className="w-full px-3.5 py-2 bg-secondary/50 border border-border/70 rounded-xl text-foreground font-sans focus:outline-none focus:border-foreground focus:ring-1 focus:ring-foreground shadow-2xs resize-none"
+                />
+              </div>
+
+
+              {/* Guest Experience Toggles */}
               <div className="pt-2 border-t border-border/60 space-y-2">
                 <label className="flex items-center justify-between cursor-pointer py-1">
                   <span className="text-foreground">Allow Account-Free Guest Uploads</span>
@@ -747,12 +967,22 @@ export default function EventOrganizerEventsPage() {
                 </label>
               </div>
 
-              <button
-                type="submit"
-                className="w-full py-3 mt-2 bg-foreground hover:bg-foreground/90 text-background font-medium text-xs font-mono uppercase tracking-[0.15em] rounded-full transition-all shadow-xs cursor-pointer"
-              >
-                Save Event Settings
-              </button>
+              {/* Action Buttons */}
+              <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-border/60">
+                <button
+                  type="button"
+                  onClick={() => setEditingEvent(null)}
+                  className="px-5 py-2.5 rounded-full bg-secondary hover:bg-secondary/80 text-foreground font-mono text-xs uppercase tracking-wider transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-foreground hover:bg-foreground/90 text-background font-medium text-xs font-mono uppercase tracking-[0.14em] rounded-full transition-all shadow-xs cursor-pointer"
+                >
+                  Save Event Settings
+                </button>
+              </div>
             </form>
           </div>
         </div>

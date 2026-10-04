@@ -41,10 +41,20 @@ class EventPolicy
 
     /**
      * Determine whether the user can delete the event.
+     * Only platform administrators are permitted to delete events.
      */
     public function delete(User $user, Event $event): bool
     {
-        return $user->id === $event->user_id || $user->isAdmin();
+        return $user->isAdmin();
+    }
+
+    /**
+     * Determine whether the user can archive or restore the event.
+     * Only platform administrators are permitted to archive events.
+     */
+    public function archive(User $user, Event $event): bool
+    {
+        return $user->isAdmin();
     }
 
     /**
@@ -55,3 +65,4 @@ class EventPolicy
         return $user->id === $event->user_id || $user->isAdmin();
     }
 }
+

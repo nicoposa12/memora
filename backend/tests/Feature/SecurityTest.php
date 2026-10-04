@@ -89,6 +89,51 @@ class SecurityTest extends TestCase
     }
 
     /**
+     * Test: Only administrators can delete or archive events.
+     */
+    public function test_regular_organizer_cannot_archive_or_delete_event_while_admin_can(): void
+    {
+        $organizer = User::factory()->create(['role' => 'organizer']);
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $event = Event::create([
+            'user_id' => $organizer->id,
+            'name' => 'Annual Gala',
+            'slug' => 'annual-gala-' . Str::random(5),
+            'event_type' => 'party',
+            'status' => 'active',
+        ]);
+
+        // 1. Regular organizer attempts to delete their own event -> 403 Forbidden
+        $organizerDeleteResponse = $this->actingAs($organizer)
+            ->deleteJson("/api/events/{$event->id}");
+        $organizerDeleteResponse->assertStatus(403);
+        $this->assertDatabaseHas('events', ['id' => $event->id]);
+
+        // 2. Regular organizer attempts to archive their own event -> 422 Unprocessable (validation error)
+        $organizerArchiveResponse = $this->actingAs($organizer)
+            ->putJson("/api/events/{$event->id}", [
+                'status' => 'archived',
+            ]);
+        $organizerArchiveResponse->assertStatus(422);
+        $this->assertEquals('active', $event->fresh()->status);
+
+        // 3. Platform Admin archives the event -> 200 OK
+        $adminArchiveResponse = $this->actingAs($admin)
+            ->putJson("/api/events/{$event->id}", [
+                'status' => 'archived',
+            ]);
+        $adminArchiveResponse->assertStatus(200);
+        $this->assertEquals('archived', $event->fresh()->status);
+
+        // 4. Platform Admin deletes the event -> 200 OK
+        $adminDeleteResponse = $this->actingAs($admin)
+            ->deleteJson("/api/events/{$event->id}");
+        $adminDeleteResponse->assertStatus(200);
+        $this->assertDatabaseMissing('events', ['id' => $event->id]);
+    }
+
+    /**
      * Test 3: Backend Authorization & Role-Based Access Control (RBAC).
      */
     public function test_rbac_restricts_admin_routes_from_regular_organizers(): void

@@ -1,5 +1,5 @@
 import { isAdminRecord, isSampleEvent } from '@/lib/adminRecords';
-export { isSampleEvent };
+export { isSampleEvent, isAdminRecord };
 
 export interface StoredUser {
   id?: string;
@@ -122,8 +122,14 @@ export function getScopedEvents(user?: StoredUser | null): any[] {
 
 /**
  * Safely delete an event by ID from the global list without affecting other users' events.
+ * Only platform administrators are permitted to delete events.
  */
-export function deleteStoredEvent(eventId: string | number): any[] {
+export function deleteStoredEvent(eventId: string | number, user?: StoredUser | null): any[] {
+  const activeUser = user !== undefined ? user : getCurrentUser();
+  if (activeUser && !isAdminRecord(activeUser)) {
+    console.warn('Unauthorized: Only administrators are authorized to delete events.');
+    return getAllEvents();
+  }
   const allEvents = getAllEvents();
   const cleanId = String(eventId);
   const updated = allEvents.filter((e) => String(e.id) !== cleanId);
@@ -133,11 +139,18 @@ export function deleteStoredEvent(eventId: string | number): any[] {
 
 /**
  * Safely update an event by ID in the global list.
+ * Only platform administrators are permitted to set or modify archived status.
  */
-export function updateStoredEvent(updatedEvent: any): any[] {
+export function updateStoredEvent(updatedEvent: any, user?: StoredUser | null): any[] {
+  const activeUser = user !== undefined ? user : getCurrentUser();
+  const safeUpdate = { ...updatedEvent };
+  if (safeUpdate.status === 'archived' && activeUser && !isAdminRecord(activeUser)) {
+    console.warn('Unauthorized: Only administrators are authorized to archive events.');
+    delete safeUpdate.status;
+  }
   const allEvents = getAllEvents();
-  const cleanId = String(updatedEvent.id);
-  const updated = allEvents.map((e) => (String(e.id) === cleanId ? { ...e, ...updatedEvent } : e));
+  const cleanId = String(safeUpdate.id);
+  const updated = allEvents.map((e) => (String(e.id) === cleanId ? { ...e, ...safeUpdate } : e));
   saveAllEvents(updated);
   return updated;
 }

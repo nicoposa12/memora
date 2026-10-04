@@ -166,12 +166,36 @@ class EventController extends Controller
 
         $validated = $request->validated();
 
+        if (isset($validated['status'])) {
+            $isArchiving = $validated['status'] === 'archived';
+            $isRestoring = $event->status === 'archived' && $validated['status'] !== 'archived';
+
+            if (($isArchiving || $isRestoring) && !$request->user()->isAdmin()) {
+                return response()->json([
+                    'message' => 'Only administrators are authorized to archive or restore events.',
+                ], 403);
+            }
+        }
+
+        if (!empty($validated['slug']) && $validated['slug'] !== $event->slug) {
+            $slug = Str::slug($validated['slug']);
+            if (Event::where('slug', $slug)->where('id', '!=', $event->id)->exists()) {
+                $slug = $slug . '-' . Str::random(4);
+            }
+            $validated['slug'] = $slug;
+        }
+
         $event->update($validated);
 
         if (!empty($validated['settings'])) {
             $event->settings()->updateOrCreate(
                 ['event_id' => $event->id],
                 $validated['settings']
+            );
+        } elseif (!empty($validated['primary_color'])) {
+            $event->settings()->updateOrCreate(
+                ['event_id' => $event->id],
+                ['primary_color' => $validated['primary_color']]
             );
         }
 

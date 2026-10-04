@@ -16,6 +16,7 @@ class UpdateEventRequest extends FormRequest
     {
         return [
             'name' => ['sometimes', 'required', 'string', 'max:150'],
+            'slug' => ['sometimes', 'string', 'max:100', 'regex:/^[a-z0-9-]+$/i'],
             'event_type' => ['sometimes', 'string', 'in:school,beach,party,wedding,birthday,graduation,corporate,debut,anniversary,other'],
             'event_date' => ['nullable', 'date'],
             'description' => ['nullable', 'string', 'max:1000'],
@@ -30,5 +31,23 @@ class UpdateEventRequest extends FormRequest
             'settings.is_public_gallery' => ['nullable', 'boolean'],
             'settings.watermark_enabled' => ['nullable', 'boolean'],
         ];
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator) {
+            $user = $this->user();
+            $event = $this->route('event');
+
+            if ($this->has('status') && $user) {
+                $newStatus = $this->input('status');
+                $isArchiving = $newStatus === 'archived';
+                $isRestoring = $event && $event->status === 'archived' && $newStatus !== 'archived';
+
+                if (($isArchiving || $isRestoring) && !$user->isAdmin()) {
+                    $validator->errors()->add('status', 'Only administrators are authorized to archive or restore events.');
+                }
+            }
+        });
     }
 }
