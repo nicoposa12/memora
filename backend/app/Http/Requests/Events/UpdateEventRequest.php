@@ -16,14 +16,14 @@ class UpdateEventRequest extends FormRequest
     {
         return [
             'name' => ['sometimes', 'required', 'string', 'max:150'],
-            'event_type' => ['sometimes', 'string', 'in:wedding,birthday,corporate,graduation,party,anniversary,other'],
+            'event_type' => ['sometimes', 'string', 'in:school,beach,party,wedding,birthday,graduation,corporate,debut,anniversary,other'],
             'event_date' => ['nullable', 'date'],
             'description' => ['nullable', 'string', 'max:1000'],
             'location' => ['nullable', 'string', 'max:255'],
             'status' => ['sometimes', 'string', 'in:draft,active,completed,archived'],
             'require_qr_token' => ['sometimes', 'boolean'],
             'settings' => ['sometimes', 'array'],
-            'settings.countdown_seconds' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'settings.countdown_seconds' => ['nullable', 'integer', 'min:0', 'max:10'],
             'settings.primary_color' => ['nullable', 'string', 'regex:/^#([a-f0-9]{6}|[a-f0-9]{3})$/i'],
             'settings.secondary_color' => ['nullable', 'string', 'regex:/^#([a-f0-9]{6}|[a-f0-9]{3})$/i'],
             'settings.enable_gallery' => ['nullable', 'boolean'],

@@ -18,6 +18,7 @@ import { QrShareCard } from './QrShareCard';
 import { generateEventSlug } from '@/lib/utils';
 import { EventType, EVENT_TYPES_LIST } from '@/types';
 import { isAdminRole } from '@/types/user';
+import { apiClient } from '@/lib/api';
 import { EventTypeSelectWithPreview } from './EventTypeSelectWithPreview';
 import { getUserEventLimitStatus, EventLimitStatus, getCurrentUser } from '@/lib/userEvents';
 
@@ -26,6 +27,8 @@ export function EventWizard() {
   const [hasStudioPlan, setHasStudioPlan] = useState<boolean>(false);
   const [limitStatus, setLimitStatus] = useState<EventLimitStatus | null>(null);
   const [isCheckingLimit, setIsCheckingLimit] = useState<boolean>(true);
+  const [isPublishing, setIsPublishing] = useState<boolean>(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -88,7 +91,7 @@ export function EventWizard() {
     { num: 2, label: 'Live Booth & QR', icon: QrCode },
   ];
 
-  const handlePublishEvent = () => {
+  const handlePublishEvent = async () => {
     const cleanName = (formData.name || '').trim();
     if (!cleanName) {
       setNameError('Please provide an event name to publish your booth.');
@@ -107,8 +110,9 @@ export function EventWizard() {
         return;
       }
 
-      const raw = localStorage.getItem('memora_events');
-      const list = raw ? JSON.parse(raw) : [];
+      setIsPublishing(true);
+      setPublishError(null);
+
       let userPlan = 'free';
       let isPremium = false;
       let organizerEmail = '';
@@ -137,35 +141,75 @@ export function EventWizard() {
         ? (location ? `${venueName} • ${location}` : venueName)
         : (location || 'Private Venue');
 
+      // Persist event directly to backend database if token exists
+      let createdEventData: any = null;
+      const token = typeof window !== 'undefined' ? localStorage.getItem('memora_token') : null;
+
+      if (token) {
+        try {
+          const res = await apiClient.post('/events', {
+            name: cleanName,
+            slug: formData.slug || generateEventSlug(cleanName),
+            event_type: formData.eventType,
+            event_date: formData.date || new Date().toISOString().split('T')[0],
+            location: venueDisplay,
+            description: (formData.description || '').trim(),
+            primary_color: formData.primaryColor || '#e6c687',
+            secondary_color: formData.secondaryColor || '#faf6ee',
+            countdown_seconds: formData.countdown ?? 3,
+            enable_gallery: formData.enableGallery ?? true,
+          });
+
+          if (res.data?.event) {
+            createdEventData = res.data.event;
+          }
+        } catch (apiErr: any) {
+          console.error('API event creation failed:', apiErr);
+          const errDetail = apiErr?.response?.data?.message || apiErr?.message || 'Unable to store event in the database. Please try again.';
+          setPublishError(errDetail);
+          setIsPublishing(false);
+          return;
+        }
+      }
+
+      const raw = localStorage.getItem('memora_events');
+      const list = raw ? JSON.parse(raw) : [];
+
       const newEvent = {
-        id: Date.now().toString(),
-        name: cleanName,
-        slug: formData.slug || generateEventSlug(cleanName),
-        eventType: formData.eventType,
-        date: formData.date || new Date().toISOString().split('T')[0],
+        id: createdEventData?.id || Date.now().toString(),
+        name: createdEventData?.name || cleanName,
+        slug: createdEventData?.slug || formData.slug || generateEventSlug(cleanName),
+        eventType: createdEventData?.event_type || formData.eventType,
+        date: createdEventData?.event_date || formData.date || new Date().toISOString().split('T')[0],
         startTime: formData.startTime || '18:00',
         endTime: formData.endTime || '23:00',
         venueName: venueName,
-        location: venueDisplay,
+        location: createdEventData?.location || venueDisplay,
         description: (formData.description || '').trim(),
         organizerName: organizerName,
         organizerEmail: organizerEmail,
         userId: userId,
-        status: 'active',
-        plan: userPlan,
-        isPremium: isPremium,
+        status: createdEventData?.status || 'active',
+        plan: createdEventData?.plan || userPlan,
+        isPremium: createdEventData?.is_premium ?? isPremium,
         photoCount: 0,
-        primaryColor: formData.primaryColor || '#e6c687',
-        secondaryColor: formData.secondaryColor || '#faf6ee',
-        countdown: formData.countdown ?? 3,
+        primaryColor: createdEventData?.settings?.primary_color || formData.primaryColor || '#e6c687',
+        secondaryColor: createdEventData?.settings?.secondary_color || formData.secondaryColor || '#faf6ee',
+        countdown: createdEventData?.settings?.countdown_seconds ?? (formData.countdown ?? 3),
         templateLayout: formData.templateLayout || 'strip',
-        enableGallery: formData.enableGallery ?? true,
-        watermark: isPremium ? false : (formData.watermark ?? true),
-        maxPhotosPerGuest: isPremium ? 9999 : (formData.maxPhotosPerGuest || 10),
+        enableGallery: createdEventData?.settings?.enable_gallery ?? (formData.enableGallery ?? true),
+        watermark: (createdEventData?.is_premium ?? isPremium) ? false : (formData.watermark ?? true),
+        maxPhotosPerGuest: (createdEventData?.is_premium ?? isPremium) ? 9999 : (formData.maxPhotosPerGuest || 10),
       };
 
-      list.unshift(newEvent);
-      localStorage.setItem('memora_events', JSON.stringify(list));
+      // Update form data slug if the server assigned an adjusted unique slug
+      if (createdEventData?.slug) {
+        setFormData(prev => ({ ...prev, slug: createdEventData.slug }));
+      }
+
+      const filtered = list.filter((e: any) => e.id !== newEvent.id && e.slug !== newEvent.slug);
+      filtered.unshift(newEvent);
+      localStorage.setItem('memora_events', JSON.stringify(filtered));
 
       try {
         const { recordRealAuditLog } = require('@/lib/adminRecords');
@@ -186,37 +230,12 @@ export function EventWizard() {
         });
       } catch {}
 
-      // Optional backend API sync if token exists
-      try {
-        const token = localStorage.getItem('memora_token');
-        if (token) {
-          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/events`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'Authorization': `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              name: newEvent.name,
-              slug: newEvent.slug,
-              event_type: newEvent.eventType,
-              event_date: newEvent.date,
-              location: newEvent.location,
-              description: newEvent.description,
-              primary_color: newEvent.primaryColor,
-              secondary_color: newEvent.secondaryColor,
-              countdown_seconds: newEvent.countdown,
-              enable_gallery: newEvent.enableGallery,
-            }),
-          }).catch(() => {});
-        }
-      } catch {}
-
+      setIsPublishing(false);
       setCurrentStep(2);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to publish event:', err);
-      setCurrentStep(2);
+      setPublishError(err?.message || 'Failed to publish event. Please try again.');
+      setIsPublishing(false);
     }
   };
 
@@ -634,6 +653,19 @@ export function EventWizard() {
               </div>
             </div>
 
+            {publishError && (
+              <div className="p-3.5 rounded-xl bg-destructive/10 border border-destructive/25 text-destructive text-xs flex items-center justify-between">
+                <span>{publishError}</span>
+                <button
+                  type="button"
+                  onClick={() => setPublishError(null)}
+                  className="ml-3 text-destructive/70 hover:text-destructive font-mono text-xs uppercase cursor-pointer"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+
             {/* Actions */}
             <div className="pt-4 flex items-center justify-between border-t border-border/60">
               <Link
@@ -645,10 +677,11 @@ export function EventWizard() {
               </Link>
               <button
                 type="button"
+                disabled={isPublishing}
                 onClick={handlePublishEvent}
-                className="px-6 py-2.5 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-mono text-xs uppercase tracking-[0.15em] font-medium transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                className="px-6 py-2.5 rounded-full bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground font-mono text-xs uppercase tracking-[0.15em] font-medium transition-all shadow-sm flex items-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
               >
-                <span>Publish & Get QR Code</span>
+                <span>{isPublishing ? 'Publishing Event...' : 'Publish & Get QR Code'}</span>
                 <Sparkles className="w-4 h-4 ml-1" />
               </button>
             </div>

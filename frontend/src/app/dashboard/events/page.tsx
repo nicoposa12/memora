@@ -27,8 +27,9 @@ import { isAdminRole } from '@/types/user';
 import { useRealtime, RealtimeStatusBadge } from '@/context/RealtimeContext';
 import { broadcastRealtime } from '@/lib/realtime';
 import { useModal } from '@/context/ModalContext';
+import { apiClient } from '@/lib/api';
 import { getEventEmoji, getEventLabel, EVENT_TYPES_LIST } from '@/types';
-import { getScopedEvents, deleteStoredEvent, updateStoredEvent, getCurrentUser, getUserEventLimitStatus, EventLimitStatus } from '@/lib/userEvents';
+import { getScopedEvents, deleteStoredEvent, updateStoredEvent, getCurrentUser, getUserEventLimitStatus, isEventOwner, EventLimitStatus } from '@/lib/userEvents';
 
 interface PhotoboothEvent {
   id: string;
@@ -63,9 +64,11 @@ export default function EventOrganizerEventsPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [limitStatus, setLimitStatus] = useState<EventLimitStatus | null>(null);
 
-  const loadEventsData = React.useCallback(() => {
+  const loadEventsData = React.useCallback(async () => {
     try {
       const u = getCurrentUser();
+      const token = typeof window !== 'undefined' ? localStorage.getItem('memora_token') : null;
+
       if (u) {
         const adminUser = isAdminRole(u.role) || u.role === 'admin';
         setIsAdmin(adminUser);
@@ -79,13 +82,11 @@ export default function EventOrganizerEventsPage() {
         }
       }
 
-      const status = getUserEventLimitStatus(u);
-      setLimitStatus(status);
-
+      // Initial fast render from local cache
       const userScoped = getScopedEvents(u);
       if (Array.isArray(userScoped) && userScoped.length > 0) {
         const mapped: PhotoboothEvent[] = userScoped.map((e: any, idx: number) => ({
-          id: e.id || `EVT-USR-${idx}`,
+          id: String(e.id || `EVT-USR-${idx}`),
           name: e.name || 'Custom Event',
           slug: e.slug || 'custom-event',
           date: e.date || 'Upcoming',
@@ -105,6 +106,100 @@ export default function EventOrganizerEventsPage() {
       } else {
         setEvents([]);
       }
+
+      // Query the backend database if authenticated
+      if (token) {
+        try {
+          const res = await apiClient.get('/events');
+          const rawDbEvents: any[] = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+
+          // Detect any local-only events that were created while sync was pending
+          // and auto-sync them to the backend database
+          const localEvents = getScopedEvents(u);
+          const unsynced = localEvents.filter((le: any) => {
+            const hasNumericOrLocalId = !le.id || /^\d+$/.test(String(le.id)) || String(le.id).startsWith('EVT-');
+            const existsInDb = rawDbEvents.some((dbe: any) => dbe.slug === le.slug || dbe.name === le.name);
+            return hasNumericOrLocalId && !existsInDb;
+          });
+
+          for (const unsyncedEvent of unsynced) {
+            try {
+              const syncRes = await apiClient.post('/events', {
+                name: unsyncedEvent.name,
+                slug: unsyncedEvent.slug,
+                event_type: unsyncedEvent.eventType || 'wedding',
+                event_date: unsyncedEvent.date || new Date().toISOString().split('T')[0],
+                location: unsyncedEvent.location || unsyncedEvent.venue || 'Private Venue',
+                description: unsyncedEvent.description || '',
+                primary_color: unsyncedEvent.primaryColor || '#e6c687',
+                secondary_color: unsyncedEvent.secondaryColor || '#faf6ee',
+                countdown_seconds: unsyncedEvent.countdown ?? 3,
+                enable_gallery: unsyncedEvent.enableGallery ?? true,
+              });
+              if (syncRes.data?.event) {
+                rawDbEvents.unshift(syncRes.data.event);
+              }
+            } catch (syncErr) {
+              console.warn('Auto-sync of unsynced event failed:', syncErr);
+            }
+          }
+
+          if (rawDbEvents.length > 0) {
+            const dbMapped: PhotoboothEvent[] = rawDbEvents.map((e: any) => ({
+              id: String(e.id),
+              name: e.name || 'Custom Event',
+              slug: e.slug || 'custom-event',
+              date: e.event_date || e.date || 'Upcoming',
+              venue: e.location || 'Private Venue',
+              eventType: e.event_type || e.eventType || 'wedding',
+              themeColor: e.settings?.primary_color || e.primaryColor || '#e6c687',
+              status: e.status || 'active',
+              plan: e.plan || (e.is_premium ? 'pro' : 'free'),
+              price: e.plan === 'pro' || e.is_premium ? '₱1,499' : '₱0',
+              paymentStatus: e.plan === 'pro' || e.is_premium ? 'PAID' : 'UNPAID',
+              photosCount: e.photos_count ?? e.photoCount ?? 0,
+              activeGuests: e.activeGuests || 0,
+              allowGuestUploads: true,
+              publicGallery: e.settings?.enable_gallery ?? true,
+            }));
+
+            setEvents(dbMapped);
+
+            // Synchronize the local storage cache with real database records
+            const rawStored = localStorage.getItem('memora_events');
+            const parsedStored = rawStored ? JSON.parse(rawStored) : [];
+            const nonUserEvents = parsedStored.filter((item: any) => !isEventOwner(item, u));
+            const updatedCache = [
+              ...rawDbEvents.map((dbe: any) => ({
+                id: String(dbe.id),
+                name: dbe.name,
+                slug: dbe.slug,
+                eventType: dbe.event_type,
+                date: dbe.event_date,
+                location: dbe.location,
+                description: dbe.description,
+                status: dbe.status,
+                plan: dbe.plan,
+                isPremium: dbe.is_premium,
+                primaryColor: dbe.settings?.primary_color || '#e6c687',
+                secondaryColor: dbe.settings?.secondary_color || '#faf6ee',
+                countdown: dbe.settings?.countdown_seconds ?? 3,
+                enableGallery: dbe.settings?.enable_gallery ?? true,
+                photoCount: dbe.photos_count ?? 0,
+                organizerEmail: u?.email,
+                userId: u?.id,
+              })),
+              ...nonUserEvents,
+            ];
+            localStorage.setItem('memora_events', JSON.stringify(updatedCache));
+          }
+        } catch (apiErr) {
+          console.warn('Could not query events from backend database:', apiErr);
+        }
+      }
+
+      const status = getUserEventLimitStatus(u);
+      setLimitStatus(status);
     } catch {}
   }, []);
 
@@ -125,19 +220,27 @@ export default function EventOrganizerEventsPage() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
+  const handleToggleArchive = async (id: string) => {
+    const target = events.find(e => e.id === id);
+    const newStatus = target?.status === 'active' ? 'archived' : 'active';
 
-  const handleToggleArchive = (id: string) => {
-    setEvents(prev => {
-      const target = prev.find(e => e.id === id);
-      const newStatus = target?.status === 'active' ? 'archived' : 'active';
-      updateStoredEvent({ id, status: newStatus });
-      broadcastRealtime('EVENT_UPDATED', { id });
-      return prev.map(e =>
+    if (typeof window !== 'undefined' && localStorage.getItem('memora_token') && !id.startsWith('EVT-USR-')) {
+      try {
+        await apiClient.put(`/events/${id}`, { status: newStatus });
+      } catch (err) {
+        console.warn('Backend archive sync failed:', err);
+      }
+    }
+
+    updateStoredEvent({ id, status: newStatus });
+    broadcastRealtime('EVENT_UPDATED', { id });
+    setEvents(prev =>
+      prev.map(e =>
         e.id === id
           ? { ...e, status: newStatus as 'active' | 'archived' }
           : e
-      );
-    });
+      )
+    );
     showToast('Event status updated.');
   };
 
@@ -153,6 +256,13 @@ export default function EventOrganizerEventsPage() {
     });
 
     if (confirmed) {
+      if (typeof window !== 'undefined' && localStorage.getItem('memora_token') && !id.startsWith('EVT-USR-')) {
+        try {
+          await apiClient.delete(`/events/${id}`);
+        } catch (err) {
+          console.warn('Backend delete sync failed:', err);
+        }
+      }
       deleteStoredEvent(id);
       setEvents(prev => prev.filter(e => e.id !== id));
       broadcastRealtime('EVENT_DELETED', { id });
@@ -160,9 +270,27 @@ export default function EventOrganizerEventsPage() {
     }
   };
 
-  const handleSaveEdit = (e: React.FormEvent) => {
+  const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingEvent) return;
+
+    if (typeof window !== 'undefined' && localStorage.getItem('memora_token') && !editingEvent.id.startsWith('EVT-USR-')) {
+      try {
+        await apiClient.put(`/events/${editingEvent.id}`, {
+          name: editingEvent.name,
+          location: editingEvent.venue,
+          event_date: editingEvent.date,
+          event_type: editingEvent.eventType,
+          status: editingEvent.status,
+          settings: {
+            primary_color: editingEvent.themeColor,
+          },
+        });
+      } catch (err) {
+        console.warn('Backend edit sync failed:', err);
+      }
+    }
+
     updateStoredEvent({
       id: editingEvent.id,
       name: editingEvent.name,

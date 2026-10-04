@@ -22,7 +22,7 @@ class CheckoutController extends Controller
             'event_id' => ['nullable', 'string'],
             'name' => ['required_without:event_id', 'string', 'max:150'],
             'event_date' => ['nullable', 'date'],
-            'event_type' => ['nullable', 'string', 'in:wedding,birthday,corporate,graduation,party,anniversary,other'],
+            'event_type' => ['nullable', 'string', 'in:school,beach,party,wedding,birthday,graduation,corporate,debut,anniversary,other'],
             'location' => ['nullable', 'string', 'max:255'],
         ]);
 

@@ -19,11 +19,14 @@ class EventController extends Controller
      */
     public function index(Request $request)
     {
-        $events = $request->user()->events()
+        $user = $request->user();
+        $query = $user->isAdmin() ? Event::query() : $user->events();
+
+        $events = $query
             ->with('settings')
             ->withCount('photos')
             ->orderBy('created_at', 'desc')
-            ->paginate(15);
+            ->paginate(50);
 
         return response()->json($events);
     }
@@ -35,11 +38,11 @@ class EventController extends Controller
     {
         $user = $request->user();
 
-        // Enforce plan requirement: Only Administrators and Active Studio subscribers can create events directly.
-        // Single-event organizers must purchase a PRO pass via /api/checkout/pro.
-        if (!$user->isAdmin() && !$user->hasActiveStudio()) {
+        // Enforce plan requirement: Administrators and Active Studio subscribers have unlimited events.
+        // Free / Trial organizers can create up to 1 event.
+        if (!$user->isAdmin() && !$user->hasActiveStudio() && $user->events()->count() >= 1) {
             return response()->json([
-                'message' => 'An active PRO Event Pass or STUDIO Subscription is required to create an event.',
+                'message' => 'An active PRO Event Pass or STUDIO Subscription is required to create additional events.',
                 'upgrade_required' => true,
             ], 403);
         }
@@ -55,10 +58,10 @@ class EventController extends Controller
             $slug = Str::slug($validated['name']) . '-' . Str::random(5);
         }
 
-        $event = DB::transaction(function () use ($request, $validated, $slug) {
-            $hasStudio = $request->user()->hasActiveStudio();
+        $event = DB::transaction(function () use ($request, $user, $validated, $slug) {
+            $hasStudio = $user->hasActiveStudio() || $user->isAdmin();
 
-            $createdEvent = $request->user()->events()->create([
+            $createdEvent = $user->events()->create([
                 'name' => $validated['name'],
                 'slug' => $slug,
                 'qr_token' => Str::random(40),
@@ -75,10 +78,10 @@ class EventController extends Controller
             // Create default settings
             $createdEvent->settings()->create([
                 'countdown_seconds' => $validated['countdown_seconds'] ?? 3,
-                'primary_color' => $validated['primary_color'] ?? '#8b5cf6',
-                'secondary_color' => $validated['secondary_color'] ?? '#ec4899',
+                'primary_color' => $validated['primary_color'] ?? '#e6c687',
+                'secondary_color' => $validated['secondary_color'] ?? '#faf6ee',
                 'enable_gallery' => $validated['enable_gallery'] ?? true,
-                'watermark_enabled' => true,
+                'watermark_enabled' => !$hasStudio,
             ]);
 
             return $createdEvent;

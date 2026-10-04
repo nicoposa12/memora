@@ -3,6 +3,7 @@
 import React, { use, useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { subscribeRealtime } from '@/lib/realtime';
+import { apiClient } from '@/lib/api';
 
 const MemoraBooth = dynamic(
   () => import('@/features/booth/components/MemoraBooth').then((mod) => mod.MemoraBooth),
@@ -61,11 +62,11 @@ export default function GuestPhotoboothPage({ params }: PageProps) {
 
     // Secondary fetch from backend API if not in local storage
     try {
-      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/events/${slug}`)
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (data?.event) {
-            setEventData(data.event);
+      apiClient
+        .get(`/events/${slug}`)
+        .then((res) => {
+          if (res.data?.event) {
+            setEventData(res.data.event);
           }
         })
         .catch(() => {});
