@@ -22,8 +22,55 @@ function installMediaPipeLogFilter() {
 }
 
 /**
+ * Loads the standalone MediaPipe Vision bundle into the browser window.
+ * Avoids Turbopack/Webpack dynamic import resolution errors during production build.
+ */
+function loadVisionScript(): Promise<any> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === 'undefined') return resolve(null);
+    const win = window as any;
+    if (win.Vision) {
+      return resolve(win.Vision);
+    }
+
+    const script = document.createElement('script');
+    script.src = '/vendor/mediapipe/vision_bundle.js';
+    script.async = true;
+
+    script.onload = () => {
+      if (win.Vision) {
+        resolve(win.Vision);
+      } else {
+        loadCdnFallback().then(resolve).catch(reject);
+      }
+    };
+
+    script.onerror = () => {
+      loadCdnFallback().then(resolve).catch(reject);
+    };
+
+    document.head.appendChild(script);
+  });
+}
+
+function loadCdnFallback(): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const win = window as any;
+    const cdnScript = document.createElement('script');
+    cdnScript.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js';
+    cdnScript.async = true;
+    cdnScript.onload = () => {
+      if (win.Vision) resolve(win.Vision);
+      else reject(new Error('MediaPipe Vision bundle failed to load from CDN'));
+    };
+    cdnScript.onerror = () => reject(new Error('Failed to load MediaPipe Vision from CDN'));
+    document.head.appendChild(cdnScript);
+  });
+}
+
+/**
  * Initializes and returns a singleton instance of MediaPipe FaceLandmarker.
- * Uses dynamic import so it is never evaluated during SSR and loads on-demand on the client.
+ * Runs 100% client-side with zero Turbopack/Webpack bundling conflicts.
  */
 export async function getFaceLandmarker(): Promise<any> {
   if (typeof window === 'undefined') return null;
@@ -34,11 +81,13 @@ export async function getFaceLandmarker(): Promise<any> {
     try {
       installMediaPipeLogFilter();
 
-      // Dynamic import prevents Webpack SSR bundling issues
-      const { FilesetResolver, FaceLandmarker } = await import('@mediapipe/tasks-vision');
+      const Vision = await loadVisionScript();
+      if (!Vision) return null;
+
+      const { FilesetResolver, FaceLandmarker } = Vision;
 
       const vision = await FilesetResolver.forVisionTasks(
-        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm'
+        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
       );
 
       try {
