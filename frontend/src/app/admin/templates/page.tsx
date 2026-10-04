@@ -32,7 +32,7 @@ import { Logo } from '@/components/Logo';
 import { useModal } from '@/context/ModalContext';
 
 export type TierType = 'free' | 'event' | 'pro';
-export type StripLayoutStyle = 'strip4' | 'strip3' | 'grid2x2' | 'grid2x3' | 'filmstrip' | 'polaroid' | 'duo';
+export type StripLayoutStyle = 'strip4' | 'strip3' | 'grid2x2' | 'grid2x3' | 'filmstrip' | 'polaroid' | 'duo' | 'diagonal_duo';
 export type DesignTheme = 'champagne' | 'editorial' | 'noir' | 'romance' | 'analog' | 'cyber' | 'gala' | 'emerald' | 'coastal';
 export type BorderOrnament = 'double_gold' | 'artdeco' | 'filigree' | 'sprockets' | 'hairline' | 'botanical' | 'none';
 export type InsigniaType = 'star' | 'crest' | 'wreath' | 'wax_seal' | 'seal_jp' | 'diamond' | 'none';
@@ -89,63 +89,6 @@ export interface TierTemplateConfig {
 
 export const DEFAULT_ATELIER_PRESETS: LuxuryTemplatePreset[] = [
   {
-    id: 'ritz_gala',
-    name: 'The Ritz Grand Gala',
-    category: 'vip',
-    subtitle: 'Classic dark background with refined double gold borders and formal crest',
-    layout: 'strip4',
-    theme: 'noir',
-    frameColor: '#0a0c10',
-    textColor: '#f5f3ef',
-    accentColor: '#d8b86a',
-    borderOrnament: 'double_gold',
-    insignia: 'crest',
-    fontFamily: 'editorial',
-    monogramText: 'VICTORIA & ALEXANDER',
-    dateText: 'MMXXVI • THE RITZ-CARLTON GRAND BALLROOM',
-    filmEdgeMarkings: false,
-    filmEdgeText: '',
-    badge: 'Black Tie Signature',
-  },
-  {
-    id: 'amalfi_wedding',
-    name: 'Amalfi Riviera Wedding',
-    category: 'wedding',
-    subtitle: 'Soft ivory background with botanical olive leaf details and gold accents',
-    layout: 'strip4',
-    theme: 'champagne',
-    frameColor: '#faf6ee',
-    textColor: '#1a1712',
-    accentColor: '#d4af37',
-    borderOrnament: 'botanical',
-    insignia: 'wreath',
-    fontFamily: 'editorial',
-    monogramText: 'CLAIRE & SEBASTIAN',
-    dateText: 'JUNE 20 • VILLA CIMBRONE • RAVELLO',
-    filmEdgeMarkings: false,
-    filmEdgeText: '',
-    badge: 'Destination Wedding',
-  },
-  {
-    id: 'vogue_met',
-    name: 'Vogue Met Gala Editorial',
-    category: 'editorial',
-    subtitle: 'Clean white layout with structured margins and minimalist diamond stamp',
-    layout: 'grid2x2',
-    theme: 'editorial',
-    frameColor: '#ffffff',
-    textColor: '#08090d',
-    accentColor: '#475569',
-    borderOrnament: 'hairline',
-    insignia: 'diamond',
-    fontFamily: 'sans',
-    monogramText: 'METROPOLITAN SOIRÉE',
-    dateText: 'OCTOBER 2026 • EDITION № 04',
-    filmEdgeMarkings: false,
-    filmEdgeText: '',
-    badge: 'Modern Editorial',
-  },
-  {
     id: 'classic_filmstrip',
     name: '35mm Noir Filmstrip',
     category: 'vintage',
@@ -166,157 +109,104 @@ export const DEFAULT_ATELIER_PRESETS: LuxuryTemplatePreset[] = [
     freeTierEligible: true,
   },
   {
-    id: 'marais_darkroom',
-    name: 'Le Marais 35mm Darkroom',
-    category: 'vintage',
-    subtitle: 'Continuous 35mm film negative with warm amber stamps',
-    layout: 'filmstrip',
-    theme: 'analog',
-    frameColor: '#0e1014',
-    textColor: '#f1f1f3',
-    accentColor: '#f59e0b',
-    borderOrnament: 'sprockets',
-    insignia: 'star',
-    fontFamily: 'mono',
-    monogramText: 'PARIS ARCHIVE 1984',
-    dateText: 'SAFETY FILM • KODAK TRI-X 400',
-    filmEdgeMarkings: true,
-    filmEdgeText: 'KODAK 400TX • 24A • EXP 36',
-    badge: 'Paris Darkroom',
+    id: 'crimson_romance',
+    name: 'Crimson Romance',
+    category: 'wedding',
+    subtitle: 'Deep crimson wine frame with dramatic calligraphy, double pose layout, and date inscription',
+    layout: 'duo',
+    theme: 'romance',
+    frameColor: '#6e0d19',
+    textColor: '#ffffff',
+    accentColor: '#f43f5e',
+    borderOrnament: 'double_gold',
+    insignia: 'crest',
+    fontFamily: 'editorial',
+    monogramText: 'YOU AND ME FOREVER',
+    dateText: '02.14.2026 • CELEBRATION',
+    filmEdgeMarkings: false,
+    filmEdgeText: '',
+    badge: 'Editorial Love',
     freeTierEligible: true,
   },
   {
-    id: 'versailles_baroque',
-    name: 'Château de Versailles',
+    id: 'music_player',
+    name: 'Aesthetic Audio Player',
     category: 'vip',
-    subtitle: 'Warm champagne background with ornamental corner filigree',
-    layout: 'strip4',
-    theme: 'gala',
-    frameColor: '#17140e',
-    textColor: '#fef3c7',
-    accentColor: '#f59e0b',
-    borderOrnament: 'artdeco',
-    insignia: 'wax_seal',
-    fontFamily: 'script',
-    monogramText: 'GENEVIEVE & JULIEN',
-    dateText: 'LE PETIT TRIANON • VERSAILLES',
-    filmEdgeMarkings: false,
-    filmEdgeText: '',
-    badge: 'Baroque Gilded',
-  },
-  {
-    id: 'soho_loft',
-    name: 'SoHo Metropolitan Loft',
-    category: 'editorial',
-    subtitle: 'Modern dark frame with clean gold perimeter line and coordinates',
-    layout: 'grid2x2',
-    theme: 'cyber',
-    frameColor: '#090c13',
-    textColor: '#f0f9ff',
-    accentColor: '#eab308',
-    borderOrnament: 'hairline',
-    insignia: 'star',
-    fontFamily: 'sans',
-    monogramText: 'GREENE ST STUDIO 4B',
-    dateText: '40.7233° N, 73.9998° W • NEW YORK',
-    filmEdgeMarkings: false,
-    filmEdgeText: '',
-    badge: 'Metro VIP',
-  },
-  {
-    id: 'rose_romance',
-    name: 'Rose Romance & Silk',
-    category: 'wedding',
-    subtitle: 'Deep burgundy frame with delicate rose gold borders',
-    layout: 'strip3',
-    theme: 'romance',
-    frameColor: '#1a0f15',
-    textColor: '#fdf2f8',
-    accentColor: '#f472b6',
-    borderOrnament: 'botanical',
-    insignia: 'crest',
-    fontFamily: 'editorial',
-    monogramText: 'ISABELLA & MATTEO',
-    dateText: 'SEPTEMBER 12 • VILLA BALBIANELLO',
-    filmEdgeMarkings: false,
-    filmEdgeText: '',
-    badge: 'Romantic Velvet',
-  },
-  {
-    id: 'monaco_grandprix',
-    name: 'Monaco Grand Prix Club',
-    category: 'vip',
-    subtitle: 'Deep emerald green background with brass borders and crest',
-    layout: 'duo',
-    theme: 'emerald',
-    frameColor: '#0a1612',
-    textColor: '#f2fbf6',
-    accentColor: '#e6c687',
-    borderOrnament: 'double_gold',
-    insignia: 'crest',
-    fontFamily: 'editorial',
-    monogramText: 'PADDOCK CLUB MONTE CARLO',
-    dateText: 'CIRCUIT DE MONACO • FORMULA 1',
-    filmEdgeMarkings: false,
-    filmEdgeText: '',
-    badge: 'Riviera VIP',
-  },
-  {
-    id: 'kyoto_wabi',
-    name: 'Kyoto Wabi-Sabi Gallery',
-    category: 'editorial',
-    subtitle: 'Minimalist charcoal frame with classic red seal stamp',
-    layout: 'duo',
-    theme: 'editorial',
-    frameColor: '#18181b',
-    textColor: '#fafaf9',
-    accentColor: '#ef4444',
-    borderOrnament: 'hairline',
-    insignia: 'seal_jp',
-    fontFamily: 'editorial',
-    monogramText: 'KYOTO GALLERY EDITION',
-    dateText: 'KYOTO • HEISEI ARCHIVE',
-    filmEdgeMarkings: false,
-    filmEdgeText: '',
-    badge: 'Wabi-Sabi Modern',
-  },
-  {
-    id: 'hamptons_linen',
-    name: 'Hamptons Solstice Linen',
-    category: 'wedding',
-    subtitle: 'Warm linen beige background with clean borders and star stamp',
-    layout: 'strip4',
-    theme: 'coastal',
-    frameColor: '#f7f4ed',
-    textColor: '#211e19',
-    accentColor: '#c29d59',
-    borderOrnament: 'double_gold',
-    insignia: 'wreath',
-    fontFamily: 'editorial',
-    monogramText: 'CAROLINE & NICHOLAS',
-    dateText: 'MONTAUK YACHT CLUB • EAST HAMPTON',
-    filmEdgeMarkings: false,
-    filmEdgeText: '',
-    badge: 'Coastal Linen',
-  },
-  {
-    id: 'ivy_collegiate',
-    name: 'High School Days & Varsity',
-    category: 'school',
-    subtitle: 'Classic campus navy with student pass, stationery supplies, and current school year memories',
+    subtitle: 'Moody obsidian frame featuring a sleek music player widget with track progress and playback controls',
     layout: 'strip3',
     theme: 'noir',
-    frameColor: '#0a1424',
-    textColor: '#f6eedb',
-    accentColor: '#d4af37',
-    borderOrnament: 'double_gold',
-    insignia: 'crest',
-    fontFamily: 'editorial',
-    monogramText: 'CAMPUS DAYS • SY 2026–2027',
-    dateText: 'CLASSMATES & FRIENDS • DAILY MEMORIES',
+    frameColor: '#121316',
+    textColor: '#ffffff',
+    accentColor: '#38bdf8',
+    borderOrnament: 'hairline',
+    insignia: 'star',
+    fontFamily: 'mono',
+    monogramText: 'ABOUT YOU • THE 1975',
+    dateText: 'TRACK 01 • MEMORA SOUND',
     filmEdgeMarkings: false,
     filmEdgeText: '',
-    badge: 'School Year Edition',
+    badge: 'Track 01 • Player',
+    freeTierEligible: true,
+  },
+  {
+    id: 'gingham_strawberry',
+    name: 'Gingham Sweet Strawberry',
+    category: 'vintage',
+    subtitle: 'Red and white picnic gingham border adorned with glossy strawberries, ribbon bow, and cherries',
+    layout: 'strip3',
+    theme: 'analog',
+    frameColor: '#d91b2c',
+    textColor: '#ffffff',
+    accentColor: '#f43f5e',
+    borderOrnament: 'none',
+    insignia: 'none',
+    fontFamily: 'script',
+    monogramText: 'SWEET STRAWBERRY',
+    dateText: 'PICNIC VIBES • SWEET ERA',
+    filmEdgeMarkings: false,
+    filmEdgeText: '',
+    badge: 'Coquette Cutie',
+    freeTierEligible: true,
+  },
+  {
+    id: 'kpop_candy_stripes',
+    name: 'Haru Pastel Candy Stripes',
+    category: 'editorial',
+    subtitle: 'Pastel sky blue candy stripes featuring Korean 사랑해요 typography, retro toy camera, and doodle stickers',
+    layout: 'strip3',
+    theme: 'coastal',
+    frameColor: '#bae6fd',
+    textColor: '#1e3a8a',
+    accentColor: '#38bdf8',
+    borderOrnament: 'hairline',
+    insignia: 'none',
+    fontFamily: 'sans',
+    monogramText: '사랑해요 • SARANGHAEYO',
+    dateText: 'HARU PHOTO • SEOUL EDITION',
+    filmEdgeMarkings: false,
+    filmEdgeText: '',
+    badge: 'Seoul K-Deco',
+    freeTierEligible: true,
+  },
+  {
+    id: 'vintage_postcard',
+    name: 'Vintage Archival Postcard',
+    category: 'vintage',
+    subtitle: 'Aged parchment card featuring a diagonal duo photo layout, vintage postmark stamp, and letterpress typography',
+    layout: 'diagonal_duo',
+    theme: 'analog',
+    frameColor: '#f6efe3',
+    textColor: '#2c1e14',
+    accentColor: '#8c735d',
+    borderOrnament: 'hairline',
+    insignia: 'diamond',
+    fontFamily: 'editorial',
+    monogramText: 'MEMORA ARCHIVAL PRINT',
+    dateText: 'AIR MAIL • POSTE RESTANTE',
+    filmEdgeMarkings: false,
+    filmEdgeText: '',
+    badge: 'Vintage Postcard',
+    freeTierEligible: true,
   },
 ];
 
@@ -393,6 +283,15 @@ export const STRIP_STYLES: Array<{
     desc: 'Two vertical portraits with clean margins and minimalist typography.',
     icon: Maximize2,
     tiers: ['event', 'pro'],
+  },
+  {
+    id: 'diagonal_duo',
+    label: 'Vintage Diagonal Duo',
+    poses: '2 Poses',
+    badge: 'Diagonal Duo',
+    desc: 'Staggered 2-photo diagonal arrangement on a landscape card with vintage postal stamps and letterpress typography.',
+    icon: LayoutGrid,
+    tiers: ['free', 'event', 'pro'],
   },
 ];
 
@@ -659,7 +558,7 @@ export default function AdminTemplatesGovernancePage() {
       dateText: preset.dateText,
       filmEdgeMarkings: preset.filmEdgeMarkings,
       filmEdgeText: preset.filmEdgeText,
-      photoCount: preset.layout === 'strip3' ? 3 : preset.layout === 'duo' ? 2 : preset.layout === 'polaroid' ? 1 : 4,
+      photoCount: preset.layout === 'strip3' ? 3 : (preset.layout === 'duo' || preset.layout === 'diagonal_duo') ? 2 : preset.layout === 'polaroid' ? 1 : 4,
     });
   };
 
@@ -667,7 +566,7 @@ export default function AdminTemplatesGovernancePage() {
     let count = 4;
     if (layoutId === 'grid2x3') count = 6;
     else if (layoutId === 'strip3') count = 3;
-    else if (layoutId === 'duo') count = 2;
+    else if (layoutId === 'duo' || layoutId === 'diagonal_duo') count = 2;
     else if (layoutId === 'polaroid') count = 1;
     
     // Automatically adjust borderOrnament if switching away from filmstrip
@@ -719,7 +618,7 @@ export default function AdminTemplatesGovernancePage() {
   const handleRestoreSamplePresets = async () => {
     const confirmed = await confirmModal({
       title: 'Restore Default Presets',
-      description: 'Restore the 10 default template presets to your library?',
+      description: 'Restore the default 35mm Noir Filmstrip template preset to your library?',
       confirmText: 'Restore Presets',
       cancelText: 'Keep Current',
       variant: 'info',
@@ -728,7 +627,7 @@ export default function AdminTemplatesGovernancePage() {
     if (confirmed) {
       setTemplates(DEFAULT_ATELIER_PRESETS);
       localStorage.setItem('memora_admin_templates', JSON.stringify(DEFAULT_ATELIER_PRESETS));
-      showNotification('Default template presets restored.');
+      showNotification('Default template preset restored.');
     }
   };
 
@@ -799,7 +698,7 @@ export default function AdminTemplatesGovernancePage() {
   const getVisibleCount = () => {
     if (current.stripLayout === 'grid2x3') return 6;
     if (current.stripLayout === 'strip3') return 3;
-    if (current.stripLayout === 'duo') return 2;
+    if (current.stripLayout === 'duo' || current.stripLayout === 'diagonal_duo') return 2;
     if (current.stripLayout === 'polaroid') return 1;
     return 4;
   };
@@ -1085,7 +984,7 @@ export default function AdminTemplatesGovernancePage() {
                     <h3 className="font-display text-2xl text-foreground font-light">Frame Layout Architecture</h3>
                   </div>
                   <span className="text-[10px] font-mono uppercase px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 font-semibold">
-                    6 Available Frame Geometries
+                    7 Available Frame Geometries
                   </span>
                 </div>
 
@@ -1357,7 +1256,7 @@ export default function AdminTemplatesGovernancePage() {
 
               {/* Physical Strip Container */}
               <div 
-                className="w-full max-w-[320px] rounded-lg p-4 sm:p-5 shadow-2xl border border-border/80 transition-all duration-500 relative flex flex-col items-center"
+                className={`w-full ${current.stripLayout === 'diagonal_duo' || current.stripLayout === 'grid2x2' || current.stripLayout === 'grid2x3' ? 'max-w-[360px]' : 'max-w-[320px]'} rounded-lg p-4 sm:p-5 shadow-2xl border border-border/80 transition-all duration-500 relative flex flex-col items-center`}
                 style={{ 
                   backgroundColor: getValidCssColor(current.frameColor),
                   color: current.textColor,
@@ -1508,6 +1407,56 @@ export default function AdminTemplatesGovernancePage() {
                           }}
                         />
                       ))}
+                    </div>
+                  </div>
+                ) : current.stripLayout === 'diagonal_duo' ? (
+                  <div className="w-full grid grid-cols-2 gap-2 relative z-10">
+                    <div 
+                      className="relative overflow-hidden aspect-[4/3] rounded-xs shadow-inner flex flex-col items-center justify-center transition-all"
+                      style={{
+                        border: `1.5px dashed ${current.accentColor}55`,
+                        backgroundColor: `${current.textColor}08`,
+                      }}
+                    >
+                      <div className="flex flex-col items-center justify-center gap-1 p-1 text-center select-none">
+                        <Camera className="w-4 h-4 opacity-70" style={{ color: current.accentColor }} />
+                        <span className="font-mono text-[8px] uppercase tracking-wider font-semibold opacity-85" style={{ color: current.textColor }}>
+                          Photo 1
+                        </span>
+                        <span className="font-mono text-[6px] uppercase tracking-widest opacity-60" style={{ color: current.accentColor }}>
+                          Top Left
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-center p-1 rounded-xs border border-dashed aspect-[4/3] overflow-hidden" style={{ borderColor: `${current.accentColor}40` }}>
+                      <span className="font-mono text-[7px] text-center opacity-70 uppercase tracking-wider" style={{ color: current.accentColor }}>
+                        Postal Stamp
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-center p-1 rounded-xs border border-dashed aspect-[4/3] overflow-hidden" style={{ borderColor: `${current.accentColor}40` }}>
+                      <span className="font-mono text-[7px] text-center opacity-70 uppercase tracking-wider" style={{ color: current.accentColor }}>
+                        Archival Inscription
+                      </span>
+                    </div>
+
+                    <div 
+                      className="relative overflow-hidden aspect-[4/3] rounded-xs shadow-inner flex flex-col items-center justify-center transition-all"
+                      style={{
+                        border: `1.5px dashed ${current.accentColor}55`,
+                        backgroundColor: `${current.textColor}08`,
+                      }}
+                    >
+                      <div className="flex flex-col items-center justify-center gap-1 p-1 text-center select-none">
+                        <Camera className="w-4 h-4 opacity-70" style={{ color: current.accentColor }} />
+                        <span className="font-mono text-[8px] uppercase tracking-wider font-semibold opacity-85" style={{ color: current.textColor }}>
+                          Photo 2
+                        </span>
+                        <span className="font-mono text-[6px] uppercase tracking-widest opacity-60" style={{ color: current.accentColor }}>
+                          Bottom Right
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ) : (

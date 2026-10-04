@@ -4,7 +4,33 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { toPng } from 'html-to-image';
 import { Logo } from '@/components/Logo';
-import { Timer, RotateCcw, Sparkles, Film, Palette, Layers, Camera, Check, Lock, ChevronDown } from 'lucide-react';
+import {
+  Timer,
+  RotateCcw,
+  Sparkles,
+  Film,
+  Palette,
+  Layers,
+  Camera,
+  Check,
+  Lock,
+  ChevronDown,
+  Palmtree,
+  PartyPopper,
+  Heart,
+  Cake,
+  BookOpen,
+  Building2,
+  GraduationCap,
+  Crown,
+  Music,
+  Star,
+  Compass,
+  Printer,
+} from 'lucide-react';
+import { BoothStripPrinter } from './BoothStripPrinter';
+import { useARFaceTracker } from '../hooks/useARFaceTracker';
+import { ARPropsSelector } from './ARPropsSelector';
 import { broadcastRealtime, subscribeRealtime } from '@/lib/realtime';
 import { GIFEncoder, quantize, applyPalette } from '@/lib/gifEncoder';
 import {
@@ -27,6 +53,7 @@ import {
   VintageBookStackIcon,
   SchoolStationeryIcon,
   SchoolAcademicFooterIcon,
+  SchoolPennantIcon,
 } from '@/components/school-theme/SchoolIcons';
 import { BeachPhotoAccents, CoastalWaveFooterIcon } from '@/components/beach-theme/BeachIcons';
 import {
@@ -70,6 +97,44 @@ import {
   GraduationTrophyIcon,
   GraduationSparklesIcon,
 } from '@/components/graduation-theme/GraduationIcons';
+import {
+  StrawberrySticker,
+  RibbonBowSticker,
+  CherriesSticker,
+  PastelStarSticker,
+  ToyCameraSticker,
+  FloatingHairHearts,
+  RedRoseSticker,
+  CrimsonRomanceHeader,
+  GinghamStrawberryHeader,
+  HaruCandyStripesHeader,
+  MusicPlayerTopHeader,
+  MusicPlayerWidget,
+  CrimsonRomanceFooter,
+  GinghamStrawberryFooter,
+  HaruCandyStripesFooter,
+  VintagePostmarkStamp,
+  VintageEditorialNote,
+  VintagePostcardHeader,
+  VintagePostcardFooter,
+  VintageTicketStub,
+  VintageCalligraphyLove,
+  VintageEtchedButterfly,
+  VintageWashiTape,
+  VintageDaisyBlossom,
+  VintageBustAccent,
+  VintageLanternAccent,
+  VintageCarAccent,
+  VintageNewspaperCollage,
+  VintageBotanicalCollage,
+} from '@/components/designer-templates/DesignerStripWidgets';
+import {
+  drawCanvasCrimsonRomance,
+  drawCanvasMusicPlayer,
+  drawCanvasGinghamStrawberry,
+  drawCanvasHaruCandyStripes,
+  drawCanvasVintagePostcard,
+} from '../utils/designerCanvasTemplates';
 
 export interface FilterOption {
   id: string;
@@ -107,6 +172,7 @@ export const LAYOUTS: LayoutOption[] = [
   { id: 'grid2x2', label: '2x2 Quad Grid', shots: 4, columns: 2 },
   { id: 'grid2x3', label: '2x3 Hexa Grid', shots: 6, columns: 2 },
   { id: 'duo', label: 'Minimalist Duo', shots: 2, columns: 1 },
+  { id: 'diagonal_duo', label: 'Diagonal Duo', shots: 2, columns: 2 },
   { id: 'polaroid', label: 'Single Polaroid', shots: 1, columns: 1 },
 ];
 
@@ -2541,7 +2607,7 @@ function drawCanvasMemoraInsignia(ctx: CanvasRenderingContext2D, cx: number, cy:
     ctx.fillStyle = color;
     ctx.font = 'bold 26px "Outfit", sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText('MEMORA', logoX + 36, cy + 6);
+    ctx.fillText('NXMEMORA', logoX + 36, cy + 6);
   }
   ctx.restore();
 }
@@ -2572,6 +2638,20 @@ export function getLayoutGeometry(layoutId: string, imageCount: number): LayoutG
     const footerHeight = 280;
     const canvasWidth = sideMargin * 2 + cols * photoWidth + gap; // 2000px
     const canvasHeight = headerHeight + rows * photoHeight + gap + footerHeight; // 1950px
+    return { cols, rows, sideMargin, gap, photoWidth, photoHeight, headerHeight, footerHeight, canvasWidth, canvasHeight };
+  }
+
+  if (layoutId === 'diagonal_duo') {
+    const cols = 2;
+    const rows = 2;
+    const sideMargin = 90;
+    const gap = 50;
+    const photoWidth = 850;
+    const photoHeight = 638; // 4:3
+    const headerHeight = 120;
+    const footerHeight = 120;
+    const canvasWidth = sideMargin * 2 + cols * photoWidth + gap; // 1930px
+    const canvasHeight = headerHeight + rows * photoHeight + gap + footerHeight; // 1616px
     return { cols, rows, sideMargin, gap, photoWidth, photoHeight, headerHeight, footerHeight, canvasWidth, canvasHeight };
   }
 
@@ -2998,12 +3078,28 @@ function drawPhotoStripContent(
   const isVogue = template.id === 'vogue_met';
   const isKyoto = template.id === 'kyoto_wabi';
 
+  const isCrimsonRomance = template.id === 'crimson_romance';
+  const isMusicPlayer = template.id === 'music_player';
+  const isGinghamStrawberry = template.id === 'gingham_strawberry';
+  const isKpopCandyStripes = template.id === 'kpop_candy_stripes';
+  const isVintagePostcard = template.id === 'vintage_postcard';
+
   const isLightCanvas = isLightColor(opts.frameColor || template.frameColor || '#ffffff');
   const schoolGold = isLightCanvas ? '#855d10' : '#d4af37';
   const schoolInk = isLightCanvas ? '#0c1a30' : '#fcf8ef';
 
   // 1. Background Fill
-  const bgColor = isSchool
+  const bgColor = isCrimsonRomance
+    ? '#6e0d19'
+    : isMusicPlayer
+    ? '#121316'
+    : isGinghamStrawberry
+    ? '#ffffff'
+    : isKpopCandyStripes
+    ? '#9fd5f6'
+    : isVintagePostcard
+    ? '#f6efe3'
+    : isSchool
     ? (isLightCanvas ? '#fdfaf3' : '#0a1424')
     : isBeach
     ? '#f0f9ff'
@@ -3023,6 +3119,27 @@ function drawPhotoStripContent(
 
   ctx.fillStyle = bgColor;
   ctx.fillRect(0, 0, width, height);
+
+  // Background patterns for special templates
+  if (isGinghamStrawberry) {
+    const checkSize = 32;
+    const numX = Math.ceil(width / checkSize);
+    const numY = Math.ceil(height / checkSize);
+    ctx.fillStyle = 'rgba(225, 29, 72, 0.32)';
+    for (let y = 0; y < numY; y += 2) {
+      ctx.fillRect(0, y * checkSize, width, checkSize);
+    }
+    for (let x = 0; x < numX; x += 2) {
+      ctx.fillRect(x * checkSize, 0, checkSize, height);
+    }
+  } else if (isKpopCandyStripes) {
+    const stripeW = 28;
+    const numStripes = Math.ceil(width / stripeW);
+    for (let i = 0; i < numStripes; i++) {
+      ctx.fillStyle = i % 2 === 0 ? '#9fd5f6' : '#ffffff';
+      ctx.fillRect(i * stripeW, 0, stripeW, height);
+    }
+  }
 
   // 2. Accent & Outer Border Colors
   const accentColor = isSchool
@@ -3151,7 +3268,7 @@ function drawPhotoStripContent(
   // 5. Top Header Inscription (Customized per Event Theme and Free Template)
   const dividerMargin = layout.id === 'filmstrip' ? (geom.railWidth || 120) : sideMargin;
 
-  if (layout.id !== 'polaroid') {
+  if (layout.id !== 'polaroid' && !isCrimsonRomance && !isMusicPlayer && !isGinghamStrawberry && !isKpopCandyStripes && !isVintagePostcard) {
     ctx.save();
     ctx.textAlign = 'center';
 
@@ -3242,8 +3359,12 @@ function drawPhotoStripContent(
   const photoRects: { x: number; y: number; w: number; h: number }[] = [];
 
   images.forEach((img, index) => {
-    const col = index % cols;
-    const row = Math.floor(index / cols);
+    let col = index % cols;
+    let row = Math.floor(index / cols);
+    if (layout.id === 'diagonal_duo') {
+      if (index === 0) { col = 0; row = 0; }
+      else if (index === 1) { col = 1; row = 1; }
+    }
     const x = sideMargin + col * (photoWidth + gap);
     const y = photoStartY + row * (photoHeight + gap);
     photoRects.push({ x, y, w: photoWidth, h: photoHeight });
@@ -3308,7 +3429,7 @@ function drawPhotoStripContent(
   }
 
   // 9. Side Embellishments (when vertical strip)
-  if (cols === 1) {
+  if (cols === 1 && !isCrimsonRomance && !isMusicPlayer && !isGinghamStrawberry && !isKpopCandyStripes && !isVintagePostcard) {
     if (isSchool) drawCanvasSchoolThemeAccents(ctx, width, height, isLightCanvas, photoRects);
     else if (isBeach) drawCanvasBeachThemeAccents(ctx, width, height, photoRects);
     else if (isParty) drawCanvasPartyThemeAccents(ctx, width, height, photoRects);
@@ -3341,15 +3462,28 @@ function drawPhotoStripContent(
     const footerTop = photoStartY + rows * photoHeight + (rows - 1) * gap + 24;
     const footerCenterY = footerTop + 65;
 
-    ctx.save();
-    ctx.strokeStyle = dividerColor;
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.moveTo(dividerMargin, footerTop);
-    ctx.lineTo(width - dividerMargin, footerTop);
-    ctx.stroke();
+    if (!isCrimsonRomance && !isMusicPlayer && !isGinghamStrawberry && !isKpopCandyStripes && !isVintagePostcard) {
+      ctx.save();
+      ctx.strokeStyle = dividerColor;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(dividerMargin, footerTop);
+      ctx.lineTo(width - dividerMargin, footerTop);
+      ctx.stroke();
+      ctx.restore();
+    }
 
-    if (isBeach) {
+    if (isCrimsonRomance) {
+      drawCanvasCrimsonRomance(ctx, width, height, photoRects, footerCenterY);
+    } else if (isMusicPlayer) {
+      drawCanvasMusicPlayer(ctx, width, height, photoRects, footerCenterY, opts.caption?.trim() || (opts.title && !opts.title.toLowerCase().includes('photobooth') ? opts.title : undefined));
+    } else if (isGinghamStrawberry) {
+      drawCanvasGinghamStrawberry(ctx, width, height, photoRects, footerCenterY);
+    } else if (isKpopCandyStripes) {
+      drawCanvasHaruCandyStripes(ctx, width, height, photoRects, footerCenterY);
+    } else if (isVintagePostcard) {
+      drawCanvasVintagePostcard(ctx, width, height, photoRects, footerCenterY, opts.caption?.trim(), layout.id === 'diagonal_duo');
+    } else if (isBeach) {
       drawCanvasWaveFooter(ctx, width / 2, footerCenterY, '#0284c7');
     } else if (isParty) {
       drawCanvasEqualizerFooter(ctx, width / 2, footerCenterY, '#ec4899');
@@ -3390,7 +3524,9 @@ function drawPhotoStripContent(
       ctx.restore();
     }
 
-    drawCanvasMemoraInsignia(ctx, width / 2, footerCenterY + 70, accentColor, opts.watermark !== false);
+    if (!isCrimsonRomance && !isMusicPlayer && !isGinghamStrawberry && !isKpopCandyStripes) {
+      drawCanvasMemoraInsignia(ctx, width / 2, footerCenterY + 70, accentColor, opts.watermark !== false);
+    }
     ctx.restore();
   }
 }
@@ -3542,8 +3678,70 @@ export interface MemoraBoothProps {
   exitHref?: string;
 }
 
+function renderTemplateIcon(tpl: AvailableTemplateOption) {
+  const id = (tpl.id || '').toLowerCase();
+  const cat = (tpl.category || '').toLowerCase();
+  const name = (tpl.name || '').toLowerCase();
+
+  let IconComponent = Sparkles;
+  let colorStyles = 'bg-cream/10 border-white/10 text-cream/70';
+
+  if (id.includes('beach') || cat.includes('beach') || name.includes('beach')) {
+    IconComponent = Palmtree;
+    colorStyles = 'bg-sky-500/15 border-sky-400/30 text-sky-400';
+  } else if (id.includes('party') || cat.includes('party') || name.includes('party')) {
+    IconComponent = PartyPopper;
+    colorStyles = 'bg-pink-500/15 border-pink-400/30 text-pink-400';
+  } else if (id.includes('wedding') || cat.includes('wedding') || name.includes('wedding')) {
+    IconComponent = Heart;
+    colorStyles = 'bg-amber-500/15 border-amber-400/30 text-amber-300';
+  } else if (id.includes('birthday') || cat.includes('birthday') || name.includes('birthday')) {
+    IconComponent = Cake;
+    colorStyles = 'bg-orange-500/15 border-orange-400/30 text-orange-400';
+  } else if (id.includes('school') || cat.includes('school') || name.includes('school')) {
+    IconComponent = BookOpen;
+    colorStyles = 'bg-blue-500/15 border-blue-400/30 text-blue-400';
+  } else if (id.includes('corporate') || cat.includes('corporate') || name.includes('corporate')) {
+    IconComponent = Building2;
+    colorStyles = 'bg-indigo-500/15 border-indigo-400/30 text-indigo-400';
+  } else if (id.includes('graduation') || cat.includes('graduation') || name.includes('graduation')) {
+    IconComponent = GraduationCap;
+    colorStyles = 'bg-yellow-500/15 border-yellow-400/30 text-yellow-400';
+  } else if (id.includes('debut') || cat.includes('debut') || name.includes('debut')) {
+    IconComponent = Crown;
+    colorStyles = 'bg-rose-500/15 border-rose-400/30 text-rose-400';
+  } else if (id.includes('film') || cat.includes('film') || name.includes('film')) {
+    IconComponent = Film;
+    colorStyles = 'bg-zinc-700/30 border-zinc-600/40 text-zinc-300';
+  } else if (id.includes('crimson') || id.includes('romance') || cat.includes('romance')) {
+    IconComponent = Heart;
+    colorStyles = 'bg-rose-950/50 border-rose-700/50 text-rose-400';
+  } else if (id.includes('music') || id.includes('audio') || name.includes('audio') || name.includes('music')) {
+    IconComponent = Music;
+    colorStyles = 'bg-purple-500/15 border-purple-400/30 text-purple-400';
+  } else if (id.includes('strawberry') || id.includes('gingham') || name.includes('strawberry')) {
+    IconComponent = Sparkles;
+    colorStyles = 'bg-red-500/15 border-red-400/30 text-red-400';
+  } else if (id.includes('kpop') || id.includes('candy') || cat.includes('kpop')) {
+    IconComponent = Star;
+    colorStyles = 'bg-sky-500/15 border-sky-400/30 text-sky-300';
+  } else if (id.includes('vintage') || id.includes('postcard') || cat.includes('vintage')) {
+    IconComponent = Compass;
+    colorStyles = 'bg-amber-800/25 border-amber-700/40 text-amber-500';
+  }
+
+  return (
+    <div
+      className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 border shadow-xs transition-colors ${colorStyles}`}
+      aria-hidden="true"
+    >
+      <IconComponent className="w-3.5 h-3.5" />
+    </div>
+  );
+}
+
 export function MemoraBooth({
-  eventName = 'Memora Booth',
+  eventName = 'NxMemora Booth',
   eventSubtitle = 'Try it now',
   eventType,
   eventSlug,
@@ -3597,7 +3795,7 @@ export function MemoraBooth({
   const [facing, setFacing] = useState<'user' | 'environment'>('user');
   const [hasMultipleCameras, setHasMultipleCameras] = useState<boolean>(false);
 
-  const [phase, setPhase] = useState<'intro' | 'shooting' | 'editing'>('intro');
+  const [phase, setPhase] = useState<'intro' | 'shooting' | 'printing' | 'editing'>('intro');
   const initialDefaultTemplateId = (initialDetectedType && PRO_EVENT_THEME_TEMPLATES[initialDetectedType]) 
     ? PRO_EVENT_THEME_TEMPLATES[initialDetectedType].id 
     : 'classic_filmstrip';
@@ -3608,6 +3806,15 @@ export function MemoraBooth({
   ]);
   const [showAllTemplates, setShowAllTemplates] = useState<boolean>(false);
   const [showAllStudioTemplates, setShowAllStudioTemplates] = useState<boolean>(false);
+
+  // Live AR Face Tracker for virtual props (shades, cowboy hats, crowns, etc.)
+  const {
+    activeProp,
+    setActiveProp,
+    isModelLoading: isARLoading,
+    arCanvasRef,
+    drawARPropsOnSnapshot,
+  } = useARFaceTracker(videoRef, phase === 'shooting' && status === 'ready');
 
   // Map eventLayout to layoutId if provided
   const initialLayoutId = React.useMemo(() => {
@@ -3620,6 +3827,7 @@ export function MemoraBooth({
         grid2x2: 'grid2x2',
         grid2x3: 'grid2x3',
         duo: 'duo',
+        diagonal_duo: 'diagonal_duo',
         polaroid: 'polaroid',
       };
       if (map[eventLayout]) return map[eventLayout];
@@ -4147,8 +4355,9 @@ export function MemoraBooth({
     }
 
     ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
+    drawARPropsOnSnapshot(ctx, canvas.width, canvas.height);
     return canvas.toDataURL('image/jpeg', 0.92);
-  }, [facing]);
+  }, [facing, drawARPropsOnSnapshot]);
 
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -4194,7 +4403,7 @@ export function MemoraBooth({
 
     isShootingRef.current = false;
     if (!cancelCountdownRef.current && accumulator.length >= activeLayout.shots) {
-      setPhase('editing');
+      setPhase('printing');
     }
   }, [activeLayout.shots, countdownDuration, snapFrame, status, isShootable]);
 
@@ -4215,9 +4424,9 @@ export function MemoraBooth({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [phase, currentCountdown, status, handleSnapClick, cancelCountdown]);
 
-  // Strip & GIF rendering trigger when in editing phase
+  // Strip & GIF rendering trigger when in editing or printing phase
   useEffect(() => {
-    if (phase !== 'editing' || capturedShots.length === 0) return;
+    if ((phase !== 'editing' && phase !== 'printing') || capturedShots.length === 0) return;
 
     let isMounted = true;
     setIsRendering(true);
@@ -4293,14 +4502,531 @@ export function MemoraBooth({
   const renderStripDesign = (shots: string[] = [], designRef?: React.Ref<HTMLDivElement>) => {
     const photoSlots = Array.from({ length: Math.max(activeLayout.shots, shots.length) });
 
+    const isCrimsonRomance = selectedTemplate.id === 'crimson_romance';
+    const isMusicPlayer = selectedTemplate.id === 'music_player';
+    const isGinghamStrawberry = selectedTemplate.id === 'gingham_strawberry';
+    const isKpopCandyStripes = selectedTemplate.id === 'kpop_candy_stripes';
+    const isVintagePostcard = selectedTemplate.id === 'vintage_postcard';
+
+    const renderPhotoSlot = (pIdx: number, isGrid = false) => {
+      const cardAspect = isKpopCandyStripes && !isGrid ? 'aspect-[4/3.45]' : 'aspect-[4/3]';
+
+      const slotBg = isCrimsonRomance
+        ? '#180507'
+        : isMusicPlayer
+        ? '#0e0f14'
+        : (isGinghamStrawberry || isKpopCandyStripes)
+        ? '#ffffff'
+        : isVintagePostcard
+        ? '#fffdfa'
+        : isSchoolTheme
+        ? schoolPalette.slotBg
+        : isBeachTheme
+        ? 'rgba(2, 132, 199, 0.08)'
+        : isPartyTheme
+        ? 'rgba(236, 72, 153, 0.08)'
+        : isWeddingTheme
+        ? 'rgba(184, 134, 11, 0.05)'
+        : isBirthdayTheme
+        ? 'rgba(217, 119, 6, 0.05)'
+        : isCorporateTheme
+        ? 'rgba(37, 99, 235, 0.05)'
+        : isGraduationTheme
+        ? 'rgba(212, 175, 55, 0.08)'
+        : isDebutTheme
+        ? 'rgba(219, 39, 119, 0.06)'
+        : isLight
+        ? 'rgba(0,0,0,0.05)'
+        : 'rgba(255,255,255,0.05)';
+
+      const slotBorder = isCrimsonRomance
+        ? '#d4af37'
+        : isMusicPlayer
+        ? 'rgba(255,255,255,0.14)'
+        : isGinghamStrawberry
+        ? '#fecdd3'
+        : isKpopCandyStripes
+        ? '#e0f2fe'
+        : isVintagePostcard
+        ? 'rgba(61, 43, 31, 0.35)'
+        : isSchoolTheme
+        ? schoolPalette.slotBorder
+        : isBeachTheme
+        ? 'rgba(2, 132, 199, 0.35)'
+        : isPartyTheme
+        ? 'rgba(236, 72, 153, 0.35)'
+        : isWeddingTheme
+        ? 'rgba(184, 134, 11, 0.25)'
+        : isBirthdayTheme
+        ? 'rgba(217, 119, 6, 0.25)'
+        : isCorporateTheme
+        ? 'rgba(37, 99, 235, 0.25)'
+        : isGraduationTheme
+        ? 'rgba(212, 175, 55, 0.35)'
+        : isDebutTheme
+        ? 'rgba(219, 39, 119, 0.3)'
+        : isLight
+        ? 'rgba(0,0,0,0.12)'
+        : 'rgba(255,255,255,0.12)';
+
+      const slotShadow = isCrimsonRomance
+        ? '0 4px 16px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(212,175,55,0.2)'
+        : (isGinghamStrawberry || isKpopCandyStripes)
+        ? '0 2px 8px rgba(0,0,0,0.1)'
+        : isMusicPlayer
+        ? 'inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 16px rgba(0, 0, 0, 0.5)'
+        : isVintagePostcard
+        ? '0 1px 3px rgba(61, 43, 31, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.8)'
+        : isSchoolTheme
+        ? '0 1px 3px rgba(0,0,0,0.08)'
+        : isPartyTheme
+        ? '0 0 10px rgba(236, 72, 153, 0.15)'
+        : isWeddingTheme
+        ? '0 0 10px rgba(184, 134, 11, 0.1)'
+        : isBirthdayTheme
+        ? '0 0 10px rgba(217, 119, 6, 0.08)'
+        : undefined;
+
+      return (
+        <div
+          key={pIdx}
+          className={`relative flex flex-col items-center justify-center border transition-all ${cardAspect} ${
+            isCrimsonRomance
+              ? `${isGrid ? 'p-1' : 'p-1.5'} bg-[#180507] rounded-xs border border-[#d4af37]/70 ring-1 ring-[#d4af37]/30 overflow-visible`
+              : isKpopCandyStripes
+              ? `${isGrid ? 'p-1' : 'p-1.5'} bg-white rounded-lg shadow-sm border-sky-100/90 overflow-visible`
+              : isGinghamStrawberry
+              ? `${isGrid ? 'p-1' : 'p-1.5'} bg-white rounded-lg shadow-sm border-rose-200/90 overflow-visible`
+              : isMusicPlayer
+              ? 'rounded-lg overflow-hidden'
+              : isVintagePostcard
+              ? `${isGrid ? 'p-1' : 'p-1.5'} bg-[#fffdfa] rounded-[2px] border border-[#3d2b1f]/35 shadow-xs overflow-visible`
+              : isSchoolTheme
+              ? 'rounded-xs'
+              : 'rounded-xs'
+          }`}
+          style={{
+            backgroundColor: slotBg,
+            borderColor: slotBorder,
+            boxShadow: slotShadow,
+          }}
+        >
+          {/* Ornate corner accents for Crimson Romance */}
+          {isCrimsonRomance && (
+            <>
+              <span className="absolute top-0.5 left-1 text-[7px] font-serif text-[#d4af37] select-none pointer-events-none z-20 opacity-80">⌜</span>
+              <span className="absolute top-0.5 right-1 text-[7px] font-serif text-[#d4af37] select-none pointer-events-none z-20 opacity-80">⌝</span>
+              <span className="absolute bottom-0.5 left-1 text-[7px] font-serif text-[#d4af37] select-none pointer-events-none z-20 opacity-80">⌞</span>
+              <span className="absolute bottom-0.5 right-1 text-[7px] font-serif text-[#d4af37] select-none pointer-events-none z-20 opacity-80">⌟</span>
+            </>
+          )}
+
+          {/* Vintage Postcard photo mount corner ticks */}
+          {isVintagePostcard && (
+            <>
+              <span className="absolute top-0.5 left-1 text-[7px] font-mono text-[#8c735d] select-none pointer-events-none z-20">⌜</span>
+              <span className="absolute top-0.5 right-1 text-[7px] font-mono text-[#8c735d] select-none pointer-events-none z-20">⌝</span>
+              <span className="absolute bottom-0.5 left-1 text-[7px] font-mono text-[#8c735d] select-none pointer-events-none z-20">⌞</span>
+              <span className="absolute bottom-0.5 right-1 text-[7px] font-mono text-[#8c735d] select-none pointer-events-none z-20">⌟</span>
+            </>
+          )}
+
+          {/* Music Player Frame Accents: Corner Viewfinders */}
+          {isMusicPlayer && (
+            <>
+              <span className="absolute top-1 left-1.5 text-[6px] font-mono text-white/35 select-none pointer-events-none z-20">⌜</span>
+              <span className="absolute top-1 right-1.5 text-[6px] font-mono text-white/35 select-none pointer-events-none z-20">⌝</span>
+              <span className="absolute bottom-1 left-1.5 text-[6px] font-mono text-white/35 select-none pointer-events-none z-20">⌞</span>
+              <span className="absolute bottom-1 right-1.5 text-[6px] font-mono text-white/35 select-none pointer-events-none z-20">⌟</span>
+            </>
+          )}
+
+          {/* School Theme Corner Brackets */}
+          {isSchoolTheme && (
+            <>
+              <span className="absolute top-0.5 left-1 text-[7px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌜</span>
+              <span className="absolute top-0.5 right-1 text-[7px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌝</span>
+              <span className="absolute bottom-0.5 left-1 text-[7px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌞</span>
+              <span className="absolute bottom-0.5 right-1 text-[7px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌟</span>
+            </>
+          )}
+
+          {/* Photo Shot / Placeholder Content */}
+          {shots[pIdx] ? (
+            <div className={`absolute inset-0 overflow-hidden ${
+              isCrimsonRomance
+                ? 'rounded-[2px] m-1 border border-[#d4af37]/35'
+                : isGinghamStrawberry
+                ? 'rounded-md m-0.5 border border-rose-100'
+                : isKpopCandyStripes
+                ? 'rounded-md m-0.5 border border-sky-100'
+                : 'rounded-xs'
+            } z-0`}>
+              <img
+                src={shots[pIdx]}
+                alt={`Photo ${pIdx + 1}`}
+                className="w-full h-full object-cover"
+                style={{ filter: activeFilter.css }}
+              />
+            </div>
+          ) : (
+            <>
+              {isCrimsonRomance ? (
+                <div className="flex flex-col items-center justify-center gap-0.5 select-none z-10 p-1 text-center">
+                  <div className={`${isGrid ? 'w-5 h-5' : 'w-7 h-7'} rounded-full bg-[#d4af37]/10 border border-[#d4af37]/35 flex items-center justify-center shadow-inner`}>
+                    <Camera className={`${isGrid ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5'} text-[#d4af37]`} />
+                  </div>
+                  <span className="font-serif text-[7px] uppercase tracking-[0.2em] font-medium text-[#f5ecd5] truncate max-w-full px-0.5">
+                    {['I • L’Amour', 'II • Timeless', 'III • Forever', 'IV • Cherish', 'V • Devotion', 'VI • Romance'][pIdx % 6]}
+                  </span>
+                  <span className="text-[6px] font-serif italic text-rose-200/60 tracking-wider">
+                    Pose {pIdx + 1}
+                  </span>
+                </div>
+              ) : isGinghamStrawberry ? (
+                <div className="flex flex-col items-center justify-center gap-1 select-none z-10 p-1 text-center">
+                  <div className={`${isGrid ? 'w-6 h-6' : 'w-7 h-7'} rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center shadow-xs`}>
+                    <Camera className={`${isGrid ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-rose-500`} />
+                  </div>
+                  <span className="font-mono text-[7px] uppercase tracking-wider font-bold text-rose-800">
+                    {['Pose 1 • Smile', 'Pose 2 • Cutie', 'Pose 3 • Sweet', 'Pose 4 • Wink', 'Pose 5 • Love', 'Pose 6 • Cherish'][pIdx % 6]}
+                  </span>
+                </div>
+              ) : isKpopCandyStripes ? (
+                <div className="flex flex-col items-center justify-center gap-1 select-none z-10 p-1 text-center">
+                  <div className={`${isGrid ? 'w-6 h-6' : 'w-8 h-8'} rounded-full bg-sky-100/90 border border-sky-300/80 flex items-center justify-center shadow-xs`}>
+                    <Camera className={`${isGrid ? 'w-3 h-3' : 'w-4 h-4'} text-sky-700`} />
+                  </div>
+                  <span className="font-mono text-[7px] uppercase tracking-wider font-bold text-sky-900 drop-shadow-2xs">
+                    Photo {pIdx + 1}
+                  </span>
+                </div>
+              ) : isMusicPlayer ? (
+                <div className="flex flex-col items-center justify-center gap-1 select-none z-10 pt-2">
+                  <div className={`${isGrid ? 'w-6 h-6' : 'w-8 h-8'} rounded-full bg-white/5 border border-white/12 flex items-center justify-center shadow-inner`}>
+                    <Camera className={`${isGrid ? 'w-3 h-3' : 'w-3.5 h-3.5'} text-white/70`} />
+                  </div>
+                  <span className="font-mono text-[6.5px] uppercase tracking-[0.2em] font-medium text-white/60">
+                    PHOTO {pIdx + 1}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-0.5 p-1 select-none opacity-85">
+                  <Camera
+                    className={`${isGrid ? 'w-3 h-3' : 'w-3.5 h-3.5'}`}
+                    style={{
+                      color: isSchoolTheme
+                        ? schoolPalette.textSecondary
+                        : isPartyTheme
+                        ? '#ec4899'
+                        : isWeddingTheme
+                        ? '#b8860b'
+                        : isBirthdayTheme
+                        ? '#d97706'
+                        : isCorporateTheme
+                        ? '#2563eb'
+                        : isGraduationTheme
+                        ? '#d4af37'
+                        : isBeachTheme
+                        ? '#0284c7'
+                        : undefined,
+                    }}
+                  />
+                  <span
+                    className="font-mono text-[6.5px] uppercase tracking-wider font-semibold"
+                    style={{
+                      color: isSchoolTheme
+                        ? schoolPalette.textPrimary
+                        : isPartyTheme
+                        ? '#f4f4f5'
+                        : isWeddingTheme
+                        ? '#1f1b18'
+                        : isBirthdayTheme
+                        ? '#18181b'
+                        : isCorporateTheme
+                        ? '#0f172a'
+                        : isGraduationTheme
+                        ? '#fcf8ef'
+                        : isBeachTheme
+                        ? '#0f172a'
+                        : undefined,
+                    }}
+                  >
+                    {isPartyTheme
+                      ? ['PRE-GAME', 'DANCE FLOOR', 'MIDNIGHT', 'VIP CREW', 'AFTER HOURS', 'LAST CALL'][pIdx % 6]
+                      : isWeddingTheme
+                      ? ['CEREMONY', 'COCKTAILS', 'FIRST DANCE', 'AFTER PARTY', 'GOLDEN HOUR', 'SPARKLERS'][pIdx % 6]
+                      : isBirthdayTheme
+                      ? ['PARTY VIBES', 'MAKE A WISH', 'CAKE TIME', 'SQUAD', 'GIFT MOMENT', 'ALL SMILES'][pIdx % 6]
+                      : isCorporateTheme
+                      ? ['KEYNOTE', 'TEAM SYNERGY', 'BREAKOUT', 'CELEBRATION', 'LEADERSHIP', 'MOMENTS'][pIdx % 6]
+                      : isGraduationTheme
+                      ? ['CAP & GOWN', 'COMMENCEMENT', 'DIPLOMA', 'CELEBRATE', 'ALUMNI', 'FUTURE AHEAD'][pIdx % 6]
+                      : isBeachTheme
+                      ? ['SURF VIBES', 'OCEAN BREEZE', 'GOLDEN SAND', 'SUNSET GLOW', 'TROPICAL COOL', 'HIGH TIDE'][pIdx % 6]
+                      : `Photo ${pIdx + 1}`}
+                  </span>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Decorative Stickers & Corner Accents per layout */}
+          {/* Gingham Strawberry Accents */}
+          {isGinghamStrawberry && !isGrid && pIdx === 0 && (
+            <div className="absolute -right-3.5 -bottom-2 z-20 pointer-events-none drop-shadow-md transform rotate-12">
+              <StrawberrySticker size={32} />
+            </div>
+          )}
+          {isGinghamStrawberry && !isGrid && pIdx === 1 && (
+            <div className="absolute -left-3.5 top-1/2 -translate-y-1/2 z-20 pointer-events-none drop-shadow-md">
+              <RibbonBowSticker size={34} />
+            </div>
+          )}
+          {isGinghamStrawberry && !isGrid && pIdx === 2 && (
+            <div className="absolute -right-3.5 top-1/2 -translate-y-1/2 z-20 pointer-events-none drop-shadow-md">
+              <CherriesSticker size={32} />
+            </div>
+          )}
+          {isGinghamStrawberry && !isGrid && pIdx === 3 && (
+            <>
+              <div className="absolute -left-3.5 top-1/2 -translate-y-1/2 z-20 pointer-events-none drop-shadow-md transform -rotate-12">
+                <RibbonBowSticker size={32} />
+              </div>
+              <div className="absolute -right-3 -bottom-1.5 z-20 pointer-events-none drop-shadow-md transform rotate-12">
+                <StrawberrySticker size={26} />
+              </div>
+            </>
+          )}
+          {/* Gingham Strawberry Grid Accents (placed on outer corners so they never clash in the center gap) */}
+          {isGinghamStrawberry && isGrid && pIdx === 0 && (
+            <div className="absolute -left-3 -top-3 z-20 pointer-events-none drop-shadow-md transform -rotate-12">
+              <RibbonBowSticker size={26} />
+            </div>
+          )}
+          {isGinghamStrawberry && isGrid && pIdx === 1 && (
+            <div className="absolute -right-3 -top-3 z-20 pointer-events-none drop-shadow-md transform rotate-12">
+              <StrawberrySticker size={26} />
+            </div>
+          )}
+          {isGinghamStrawberry && isGrid && pIdx === photoSlots.length - 1 && (
+            <div className="absolute -right-3 -bottom-3 z-20 pointer-events-none drop-shadow-md transform rotate-12">
+              <CherriesSticker size={26} />
+            </div>
+          )}
+
+          {/* Korean Idol / Artist Companion Cutouts for Haru Candy Stripes */}
+          {isKpopCandyStripes && !isGrid && (
+            <div className="absolute inset-0 overflow-hidden rounded-lg pointer-events-none z-10 select-none">
+              <div
+                className={`absolute bottom-0 flex items-end ${
+                  pIdx % 2 === 1 ? 'left-0 justify-start' : 'right-0 justify-end'
+                } ${pIdx === 2 ? 'h-[66%]' : 'h-[64%]'}`}
+              >
+                <img
+                  src={`/templates/kpop/idol_pose_${pIdx === 3 ? 2 : (pIdx % 3) + 1}.png`}
+                  alt="Korean Artist"
+                  className="h-full w-auto object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.18)]"
+                />
+              </div>
+            </div>
+          )}
+          {isKpopCandyStripes && !isGrid && pIdx === 0 && (
+            <div className="absolute -left-3 -top-2 z-20 pointer-events-none drop-shadow-md transform -rotate-12">
+              <ToyCameraSticker size={32} />
+            </div>
+          )}
+          {isKpopCandyStripes && !isGrid && pIdx === 1 && (
+            <div className="absolute -right-3.5 -bottom-2 z-20 pointer-events-none drop-shadow-md transform rotate-12">
+              <CherriesSticker size={28} />
+            </div>
+          )}
+          {isKpopCandyStripes && !isGrid && pIdx === 2 && (
+            <>
+              <div className="absolute top-1 right-6 z-20 pointer-events-none drop-shadow-xs">
+                <FloatingHairHearts />
+              </div>
+              <div className="absolute bottom-2.5 left-3 z-20 pointer-events-none drop-shadow-md">
+                <RedRoseSticker size={24} />
+              </div>
+            </>
+          )}
+          {isKpopCandyStripes && !isGrid && pIdx === 3 && (
+            <>
+              <div className="absolute top-1 left-5 z-20 pointer-events-none drop-shadow-xs">
+                <FloatingHairHearts />
+              </div>
+              <div className="absolute -right-3 -bottom-2 z-20 pointer-events-none drop-shadow-md transform rotate-12">
+                <PastelStarSticker size={30} />
+              </div>
+            </>
+          )}
+          {isKpopCandyStripes && isGrid && pIdx === 0 && (
+            <div className="absolute -left-2.5 -top-2.5 z-20 pointer-events-none drop-shadow-xs">
+              <FloatingHairHearts />
+            </div>
+          )}
+          {isKpopCandyStripes && isGrid && pIdx === photoSlots.length - 1 && (
+            <div className="absolute -right-2.5 -bottom-2.5 z-20 pointer-events-none drop-shadow-md transform rotate-12">
+              <CherriesSticker size={22} />
+            </div>
+          )}
+
+          {/* School Theme Stickers */}
+          {isSchoolTheme && !isGrid && pIdx === 0 && (
+            <div className="absolute -right-3.5 -bottom-3.5 z-20 pointer-events-none transform rotate-[7deg] drop-shadow-md">
+              <StudentIdBadgeIcon isLight={isSchoolLight} size={36} />
+            </div>
+          )}
+          {isSchoolTheme && !isGrid && pIdx === 1 && (
+            <div className="absolute -left-3.5 -bottom-3 z-20 pointer-events-none transform -rotate-[6deg] drop-shadow-md">
+              <VintageBookStackIcon isLight={isSchoolLight} size={36} />
+            </div>
+          )}
+          {isSchoolTheme && !isGrid && pIdx === 2 && (
+            <div className="absolute -right-3.5 -bottom-3 z-20 pointer-events-none transform rotate-[7deg] drop-shadow-md">
+              <SchoolStationeryIcon isLight={isSchoolLight} size={36} />
+            </div>
+          )}
+          {isSchoolTheme && !isGrid && pIdx === 3 && (
+            <div className="absolute -left-3.5 -bottom-3 z-20 pointer-events-none transform -rotate-[6deg] drop-shadow-md">
+              <SchoolPennantIcon isLight={isSchoolLight} size={34} />
+            </div>
+          )}
+          {isSchoolTheme && isGrid && pIdx === 0 && (
+            <div className="absolute -left-3 -top-3 z-20 pointer-events-none transform -rotate-12 drop-shadow-md">
+              <StudentIdBadgeIcon isLight={isSchoolLight} size={28} />
+            </div>
+          )}
+          {isSchoolTheme && isGrid && pIdx === photoSlots.length - 1 && (
+            <div className="absolute -right-3 -bottom-3 z-20 pointer-events-none transform rotate-12 drop-shadow-md">
+              <VintageBookStackIcon isLight={isSchoolLight} size={28} />
+            </div>
+          )}
+
+          {/* Event Theme Embellishments */}
+          {!isGrid && isBeachTheme && (
+            <BeachPhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
+          )}
+          {!isGrid && isPartyTheme && (
+            <PartyPhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
+          )}
+          {!isGrid && isWeddingTheme && (
+            <WeddingPhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
+          )}
+          {!isGrid && isBirthdayTheme && (
+            <BirthdayPhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
+          )}
+          {!isGrid && isCorporateTheme && (
+            <CorporatePhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
+          )}
+          {!isGrid && isGraduationTheme && (
+            <GraduationPhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
+          )}
+
+          {/* Vintage Scrapbook Accents for isVintagePostcard in Diagonal Duo */}
+          {isVintagePostcard && layoutId === 'diagonal_duo' && pIdx === 0 && (
+            <>
+              <div className="absolute -top-4 -left-3.5 z-25 pointer-events-none drop-shadow-xs transform -rotate-6">
+                <VintageBustAccent size={46} />
+              </div>
+              <div className="absolute -top-2.5 left-7 z-25 pointer-events-none">
+                <VintageDaisyBlossom size={18} />
+              </div>
+              <VintageWashiTape rotate="8deg" className="absolute -top-1.5 -right-1 z-30" />
+            </>
+          )}
+          {isVintagePostcard && layoutId === 'diagonal_duo' && pIdx === 1 && (
+            <>
+              <VintageWashiTape rotate="-7deg" className="absolute -top-1.5 -left-1 z-30" />
+              <div className="absolute -bottom-3.5 -right-3 z-25 pointer-events-none drop-shadow-md transform rotate-3">
+                <VintageLanternAccent size={44} />
+              </div>
+            </>
+          )}
+
+          {/* Vintage Scrapbook Accents for Vertical Strips */}
+          {isVintagePostcard && !isGrid && pIdx === 0 && (
+            <>
+              <div className="absolute -top-4 -left-3.5 z-25 pointer-events-none drop-shadow-xs transform -rotate-6">
+                <VintageBustAccent size={46} />
+              </div>
+              <div className="absolute -top-2.5 left-7 z-25 pointer-events-none">
+                <VintageDaisyBlossom size={18} />
+              </div>
+              <VintageWashiTape rotate="7deg" className="absolute -top-1.5 -right-1 z-30" />
+            </>
+          )}
+          {isVintagePostcard && !isGrid && pIdx === 1 && (
+            <>
+              <div className="absolute -left-3.5 -bottom-2 z-25 pointer-events-none drop-shadow-xs transform -rotate-3">
+                <VintageCarAccent size={48} />
+              </div>
+              <VintageWashiTape rotate="-6deg" className="absolute -bottom-1 -right-1 z-30" />
+            </>
+          )}
+          {isVintagePostcard && !isGrid && pIdx === 2 && (
+            <>
+              <div className="absolute top-1 left-2 z-25 pointer-events-none drop-shadow-xs">
+                <VintageEtchedButterfly size={24} />
+              </div>
+              <div className="absolute -right-3 -bottom-2 z-25 pointer-events-none drop-shadow-xs transform rotate-6 scale-90">
+                <VintageTicketStub number="72411" />
+              </div>
+            </>
+          )}
+          {isVintagePostcard && !isGrid && pIdx === 3 && (
+            <>
+              <img
+                src="/templates/vintage/roses.jpg"
+                alt="Roses"
+                className="absolute -left-3 -bottom-3 w-16 h-auto mix-blend-multiply opacity-95 pointer-events-none z-25"
+              />
+              <div className="absolute -right-3 -bottom-3 z-25 pointer-events-none drop-shadow-md transform rotate-3">
+                <VintageLanternAccent size={42} />
+              </div>
+            </>
+          )}
+
+          {/* Vintage Scrapbook Accents for 2x2 Grid */}
+          {isVintagePostcard && isGrid && layoutId !== 'diagonal_duo' && pIdx === 0 && (
+            <>
+              <div className="absolute -top-3.5 -left-3 z-25 pointer-events-none transform -rotate-6">
+                <VintageBustAccent size={38} />
+              </div>
+              <VintageWashiTape rotate="6deg" className="absolute -top-1 -right-1 z-30" />
+            </>
+          )}
+          {isVintagePostcard && isGrid && layoutId !== 'diagonal_duo' && pIdx === photoSlots.length - 1 && (
+            <>
+              <div className="absolute -right-3 -bottom-3 z-25 pointer-events-none transform rotate-3">
+                <VintageLanternAccent size={38} />
+              </div>
+              <VintageWashiTape rotate="-6deg" className="absolute -bottom-1 -left-1 z-30" />
+            </>
+          )}
+        </div>
+      );
+    };
+
     return (
       <div
         ref={designRef}
-        className={`rounded-xl transition-all duration-300 shadow-2xl relative p-3.5 flex flex-col items-center h-auto min-h-fit self-start shrink-0 ${
-          layoutId === 'grid2x2' || layoutId === 'grid2x3' ? 'w-72 sm:w-80' : 'w-60'
+        className={`rounded-xl transition-all duration-300 shadow-2xl relative ${
+          isKpopCandyStripes ? 'px-2 py-3' : isVintagePostcard && layoutId === 'diagonal_duo' ? 'p-3' : 'p-3.5'
+        } flex flex-col items-center h-auto min-h-fit self-start shrink-0 ${
+          layoutId === 'diagonal_duo' || layoutId === 'grid2x2' || layoutId === 'grid2x3' ? 'w-80 sm:w-[350px]' : 'w-60'
         }`}
       style={{
-        backgroundColor: isSchoolTheme
+        backgroundColor: isCrimsonRomance
+          ? '#6e0d19'
+          : isMusicPlayer
+          ? '#121316'
+          : isGinghamStrawberry || isKpopCandyStripes
+          ? '#ffffff'
+          : isVintagePostcard
+          ? '#f6efe3'
+          : isSchoolTheme
           ? schoolPalette.bg
           : isBeachTheme
           ? (frameId !== 'classic' ? activeFrame.paper : '#f0f9ff')
@@ -4317,7 +5043,30 @@ export function MemoraBooth({
           : isDebutTheme
           ? (frameId !== 'classic' ? activeFrame.paper : '#fff5f7')
           : (frameId !== 'classic' ? activeFrame.paper : selectedTemplate.frameColor),
-        color: isSchoolTheme
+        backgroundImage: isCrimsonRomance
+          ? 'radial-gradient(circle at 50% 20%, #7e101f 0%, #4a0710 100%)'
+          : isGinghamStrawberry
+          ? 'repeating-linear-gradient(0deg, rgba(225, 29, 72, 0.28) 0px, rgba(225, 29, 72, 0.28) 12px, transparent 12px, transparent 24px), repeating-linear-gradient(90deg, rgba(225, 29, 72, 0.28) 0px, rgba(225, 29, 72, 0.28) 12px, transparent 12px, transparent 24px)'
+          : isKpopCandyStripes
+          ? 'repeating-linear-gradient(90deg, #9fd5f6 0px, #9fd5f6 14px, #ffffff 14px, #ffffff 28px)'
+          : isMusicPlayer
+          ? 'radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.14) 0%, transparent 50%), radial-gradient(circle at 50% 100%, rgba(244, 63, 94, 0.08) 0%, transparent 50%)'
+          : isVintagePostcard
+          ? "url('/templates/vintage/paper_bg.jpg')"
+          : undefined,
+        backgroundSize: isVintagePostcard ? 'cover' : undefined,
+        backgroundPosition: isVintagePostcard ? 'center' : undefined,
+        color: isCrimsonRomance
+          ? '#ffffff'
+          : isMusicPlayer
+          ? '#ffffff'
+          : isGinghamStrawberry
+          ? '#e11d48'
+          : isKpopCandyStripes
+          ? '#0369a1'
+          : isVintagePostcard
+          ? '#2c1e14'
+          : isSchoolTheme
           ? schoolPalette.textPrimary
           : isBeachTheme
           ? (frameId !== 'classic' ? activeFrame.ink : '#0f172a')
@@ -4334,7 +5083,17 @@ export function MemoraBooth({
           : isDebutTheme
           ? (frameId !== 'classic' ? activeFrame.ink : '#831843')
           : (frameId !== 'classic' ? activeFrame.ink : selectedTemplate.textColor),
-        border: isSchoolTheme
+        border: isCrimsonRomance
+          ? '2px solid rgba(212, 175, 55, 0.5)'
+          : isMusicPlayer
+          ? '1px solid rgba(255, 255, 255, 0.14)'
+          : isGinghamStrawberry
+          ? '2px solid #fda4af'
+          : isKpopCandyStripes
+          ? '2px solid #7dd3fc'
+          : isVintagePostcard
+          ? '1.5px solid rgba(61, 43, 31, 0.35)'
+          : isSchoolTheme
           ? schoolPalette.outerBorder
           : isBeachTheme
           ? '2px solid rgba(2, 132, 199, 0.45)'
@@ -4351,7 +5110,17 @@ export function MemoraBooth({
           : isDebutTheme
           ? '2px solid rgba(219, 39, 119, 0.45)'
           : `1px solid ${isLight ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.18)'}`,
-        boxShadow: isSchoolTheme
+        boxShadow: isCrimsonRomance
+          ? '0 10px 30px rgba(110, 13, 25, 0.45), inset 0 0 0 1px rgba(212, 175, 55, 0.25)'
+          : isMusicPlayer
+          ? '0 20px 45px -10px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.12)'
+          : isGinghamStrawberry
+          ? '0 10px 30px rgba(225, 29, 72, 0.18)'
+          : isKpopCandyStripes
+          ? '0 10px 30px rgba(56, 189, 248, 0.25)'
+          : isVintagePostcard
+          ? '0 12px 32px rgba(44, 30, 20, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.6)'
+          : isSchoolTheme
           ? schoolPalette.outerShadow
           : isBeachTheme
           ? '0 0 24px rgba(2, 132, 199, 0.18), 0 0 0 1px rgba(2, 132, 199, 0.25)'
@@ -4370,8 +5139,30 @@ export function MemoraBooth({
           : undefined,
       }}
     >
+      {/* Vintage Postcard Inner Hairline Frame */}
+      {isVintagePostcard && (
+        <div className="absolute inset-1.5 rounded-[9px] border border-[#3d2b1f]/20 pointer-events-none z-10" />
+      )}
+
       {/* Top Header Inscription */}
-      {isSchoolTheme ? (
+      {isCrimsonRomance ? (
+        <CrimsonRomanceHeader />
+      ) : isVintagePostcard ? (
+        layoutId === 'diagonal_duo' ? (
+          <div className="w-full flex items-center justify-between px-2 pt-0.5 pb-1 border-b border-[#3d2b1f]/20 text-[6.5px] font-mono tracking-[0.2em] text-[#8c735d] uppercase mb-1 z-20">
+            <span>MEMORA ARCHIVE</span>
+            <span>№ 24 • CARTE DE VISITE</span>
+          </div>
+        ) : (
+          <VintagePostcardHeader />
+        )
+      ) : isGinghamStrawberry ? (
+        <GinghamStrawberryHeader />
+      ) : isKpopCandyStripes ? (
+        <HaruCandyStripesHeader />
+      ) : isMusicPlayer ? (
+        <MusicPlayerTopHeader />
+      ) : isSchoolTheme ? (
         <div className="w-full text-center pb-2 pt-0.5 border-b mb-2" style={{ borderColor: schoolPalette.borderGold }}>
           <div className="flex items-center justify-center gap-1.5 text-[7.5px] font-mono uppercase tracking-[0.25em]" style={{ color: schoolPalette.textSecondary }}>
             <span>★</span>
@@ -4631,89 +5422,42 @@ export function MemoraBooth({
             ))}
           </div>
         </div>
-      ) : layoutId === 'grid2x2' ? (
-        /* 2x2 Quad Grid Collage */
-        <div className="w-full grid grid-cols-2 gap-1.5 py-1">
-          {photoSlots.map((_, pIdx) => (
-            <div
-              key={pIdx}
-              className="relative overflow-hidden aspect-[4/3] rounded-xs flex flex-col items-center justify-center border"
-              style={{
-                backgroundColor: isSchoolTheme ? schoolPalette.slotBg : isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)',
-                borderColor: isSchoolTheme ? schoolPalette.slotBorder : isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.12)',
-              }}
-            >
-              {shots[pIdx] ? (
-                <div className="absolute inset-0 overflow-hidden rounded-xs z-0">
-                  <img
-                    src={shots[pIdx]}
-                    alt={`Photo ${pIdx + 1}`}
-                    className="w-full h-full object-cover"
-                    style={{ filter: activeFilter.css }}
-                  />
-                </div>
-              ) : (
-                <>
-                  {isSchoolTheme && (
-                    <>
-                      <span className="absolute top-0.5 left-1 text-[6px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌜</span>
-                      <span className="absolute top-0.5 right-1 text-[6px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌝</span>
-                      <span className="absolute bottom-0.5 left-1 text-[6px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌞</span>
-                      <span className="absolute bottom-0.5 right-1 text-[6px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌟</span>
-                    </>
-                  )}
-                  <div className="flex flex-col items-center justify-center gap-0.5 p-1 select-none opacity-80">
-                    <Camera className="w-3 h-3" style={{ color: isSchoolTheme ? schoolPalette.textSecondary : undefined }} />
-                    <span className="font-mono text-[7px] uppercase tracking-wider font-semibold" style={{ color: isSchoolTheme ? schoolPalette.textPrimary : undefined }}>
-                      Photo {pIdx + 1}
-                    </span>
-                  </div>
-                </>
-              )}
-            </div>
-          ))}
+      ) : layoutId === 'grid2x2' || layoutId === 'grid2x3' ? (
+        /* 2x2 Quad Grid or 2x3 Hexa Grid Collage */
+        <div className="w-full grid grid-cols-2 gap-2 sm:gap-2.5 py-1.5 relative">
+          {photoSlots.map((_, pIdx) => renderPhotoSlot(pIdx, true))}
         </div>
-      ) : layoutId === 'grid2x3' ? (
-        /* 2x3 Hexa Grid Collage */
-        <div className="w-full grid grid-cols-2 gap-1.5 py-1">
-          {photoSlots.map((_, pIdx) => (
-            <div
-              key={pIdx}
-              className="relative overflow-hidden aspect-[4/3] rounded-xs flex flex-col items-center justify-center border"
-              style={{
-                backgroundColor: isSchoolTheme ? schoolPalette.slotBg : isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)',
-                borderColor: isSchoolTheme ? schoolPalette.slotBorder : isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.12)',
-              }}
-            >
-              {shots[pIdx] ? (
-                <div className="absolute inset-0 overflow-hidden rounded-xs z-0">
-                  <img
-                    src={shots[pIdx]}
-                    alt={`Photo ${pIdx + 1}`}
-                    className="w-full h-full object-cover"
-                    style={{ filter: activeFilter.css }}
-                  />
-                </div>
-              ) : (
-                <>
-                  {isSchoolTheme && (
-                    <>
-                      <span className="absolute top-0.5 left-1 text-[6px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌜</span>
-                      <span className="absolute top-0.5 right-1 text-[6px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌝</span>
-                      <span className="absolute bottom-0.5 left-1 text-[6px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌞</span>
-                      <span className="absolute bottom-0.5 right-1 text-[6px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌟</span>
-                    </>
-                  )}
-                  <div className="flex flex-col items-center justify-center gap-0.5 p-1 select-none opacity-80">
-                    <Camera className="w-3 h-3" style={{ color: isSchoolTheme ? schoolPalette.textSecondary : undefined }} />
-                    <span className="font-mono text-[7px] uppercase tracking-wider font-semibold" style={{ color: isSchoolTheme ? schoolPalette.textPrimary : undefined }}>
-                      Photo {pIdx + 1}
-                    </span>
-                  </div>
-                </>
-              )}
+      ) : layoutId === 'diagonal_duo' ? (
+        /* Diagonal Duo: Vintage Scrapbook Flatlay Layout */
+        <div className="w-full flex flex-col gap-1.5 py-1 relative z-20">
+          <div className="w-full grid grid-cols-2 gap-2 sm:gap-2.5 relative">
+            {/* Row 1, Col 1: Photo 1 */}
+            <div className="relative">
+              {renderPhotoSlot(0, true)}
             </div>
-          ))}
+
+            {/* Row 1, Col 2: Burnt Antique Newspaper Clipping & Etched Butterfly */}
+            <VintageNewspaperCollage />
+          </div>
+
+          {/* Center Calligraphy & Ephemera Bridge (You are my love & Retro Blue Car) */}
+          <div className="w-full flex items-center justify-between px-1.5 py-0.5 relative z-25 overflow-visible">
+            <div className="flex items-center gap-1">
+              <VintageCarAccent size={54} className="transform -rotate-2" />
+            </div>
+            <VintageCalligraphyLove text="You are my love" className="transform -rotate-1" />
+            <VintageDaisyBlossom size={16} className="drop-shadow-xs opacity-90" />
+          </div>
+
+          <div className="w-full grid grid-cols-2 gap-2 sm:gap-2.5 relative">
+            {/* Row 2, Col 1: Pressed Yellow Roses & Pink Ticket Stub */}
+            <VintageBotanicalCollage caption={caption} />
+
+            {/* Row 2, Col 2: Photo 2 */}
+            <div className="relative">
+              {renderPhotoSlot(1, true)}
+            </div>
+          </div>
         </div>
       ) : layoutId === 'polaroid' ? (
         /* Single Polaroid */
@@ -4760,7 +5504,7 @@ export function MemoraBooth({
         </div>
       ) : (
         /* Vertical Strip: Duo, 3-strip, 4-strip */
-        <div className="w-full space-y-2 py-1 relative">
+        <div className={`w-full ${layoutId === 'strip4' ? 'space-y-1.5 py-0.5' : 'space-y-2 py-1'} relative`}>
           {/* MADE OF MEMORIES Divider (School Theme) */}
           {isSchoolTheme && (
             <div className="flex items-center justify-center gap-1.5 -mb-0.5">
@@ -4780,144 +5524,12 @@ export function MemoraBooth({
             </div>
           )}
 
-          {photoSlots.map((_, pIdx) => (
-            <React.Fragment key={pIdx}>
-              <div
-                key={pIdx}
-                className="relative rounded-xs flex flex-col items-center justify-center border aspect-[4/3] transition-all"
-                style={{
-                  backgroundColor: isSchoolTheme
-                    ? schoolPalette.slotBg
-                    : isPartyTheme
-                    ? 'rgba(236, 72, 153, 0.08)'
-                    : isWeddingTheme
-                    ? 'rgba(184, 134, 11, 0.05)'
-                    : isBirthdayTheme
-                    ? 'rgba(217, 119, 6, 0.05)'
-                    : isLight
-                    ? 'rgba(0,0,0,0.05)'
-                    : 'rgba(255,255,255,0.05)',
-                  borderColor: isSchoolTheme
-                    ? schoolPalette.slotBorder
-                    : isPartyTheme
-                    ? 'rgba(236, 72, 153, 0.35)'
-                    : isWeddingTheme
-                    ? 'rgba(184, 134, 11, 0.25)'
-                    : isBirthdayTheme
-                    ? 'rgba(217, 119, 6, 0.25)'
-                    : isLight
-                    ? 'rgba(0,0,0,0.12)'
-                    : 'rgba(255,255,255,0.12)',
-                  boxShadow: isSchoolTheme
-                    ? '0 1px 3px rgba(0,0,0,0.08)'
-                    : isPartyTheme
-                    ? '0 0 10px rgba(236, 72, 153, 0.15)'
-                    : isWeddingTheme
-                    ? '0 0 10px rgba(184, 134, 11, 0.1)'
-                    : isBirthdayTheme
-                    ? '0 0 10px rgba(217, 119, 6, 0.08)'
-                    : undefined,
-                }}
-              >
-                {shots[pIdx] ? (
-                  <div className="absolute inset-0 overflow-hidden rounded-xs z-0">
-                    <img
-                      src={shots[pIdx]}
-                      alt={`Photo ${pIdx + 1}`}
-                      className="w-full h-full object-cover"
-                      style={{ filter: activeFilter.css }}
-                    />
-                  </div>
-                ) : (
-                  <>
-                    {isSchoolTheme && (
-                      <>
-                        <span className="absolute top-0.5 left-1 text-[7px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌜</span>
-                        <span className="absolute top-0.5 right-1 text-[7px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌝</span>
-                        <span className="absolute bottom-0.5 left-1 text-[7px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌞</span>
-                        <span className="absolute bottom-0.5 right-1 text-[7px] leading-none select-none font-serif" style={{ color: schoolPalette.textSecondary }}>⌟</span>
-                      </>
-                    )}
-                    <div className="flex flex-col items-center justify-center gap-0.5 p-1 select-none opacity-85">
-                      <Camera className="w-3.5 h-3.5" style={{ color: isSchoolTheme ? schoolPalette.textSecondary : isPartyTheme ? '#ec4899' : isWeddingTheme ? '#b8860b' : isBirthdayTheme ? '#d97706' : undefined }} />
-                      <span className="font-mono text-[7px] uppercase tracking-wider font-semibold" style={{ color: isSchoolTheme ? schoolPalette.textPrimary : isPartyTheme ? '#f4f4f5' : isWeddingTheme ? '#1f1b18' : isBirthdayTheme ? '#18181b' : undefined }}>
-                        {isPartyTheme
-                          ? ['PRE-GAME', 'DANCE FLOOR', 'MIDNIGHT', 'VIP CREW'][pIdx % 4]
-                          : isWeddingTheme
-                          ? ['CEREMONY', 'COCKTAILS', 'FIRST DANCE', 'AFTER PARTY'][pIdx % 4]
-                          : isBirthdayTheme
-                          ? ['PARTY VIBES', 'MAKE A WISH', 'CAKE TIME', 'SQUAD'][pIdx % 4]
-                          : `Photo ${pIdx + 1}`}
-                      </span>
-                    </div>
-                  </>
-                )}
-
-                {/* Sticker 1: Student ID Badge sticker on Right Edge of Photo 1 */}
-                {isSchoolTheme && pIdx === 0 && (
-                  <div className="absolute -right-3.5 -bottom-3.5 z-20 pointer-events-none transform rotate-[7deg] drop-shadow-md">
-                    <StudentIdBadgeIcon isLight={isSchoolLight} size={36} />
-                  </div>
-                )}
-
-                {/* Sticker 2: Vintage Book Stack sticker on Left Edge of Photo 2 */}
-                {isSchoolTheme && pIdx === 1 && (
-                  <div className="absolute -left-3.5 -bottom-3 z-20 pointer-events-none transform -rotate-[6deg] drop-shadow-md">
-                    <VintageBookStackIcon isLight={isSchoolLight} size={36} />
-                  </div>
-                )}
-
-                {/* Sticker 3: School Stationery sticker on Right Edge of Photo 3 */}
-                {isSchoolTheme && pIdx === 2 && (
-                  <div className="absolute -right-3.5 -bottom-3 z-20 pointer-events-none transform rotate-[7deg] drop-shadow-md">
-                    <SchoolStationeryIcon isLight={isSchoolLight} size={36} />
-                  </div>
-                )}
-
-                {/* Sticker 4: Student ID Badge sticker on Left Edge of Photo 4 if 4 poses */}
-                {isSchoolTheme && pIdx === 3 && (
-                  <div className="absolute -left-3.5 -bottom-3 z-20 pointer-events-none transform -rotate-[6deg] drop-shadow-md">
-                    <StudentIdBadgeIcon isLight={isSchoolLight} size={34} />
-                  </div>
-                )}
-
-                {/* Coastal Beach Theme Embellishments: shells, bubbles, plumeria, waves, starfish along margins */}
-                {isBeachTheme && (
-                  <BeachPhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
-                )}
-
-                {/* Nightclub & Party Theme Embellishments: disco ball, headphones, camera flash, vinyl, dancers, lightning, flame */}
-                {isPartyTheme && (
-                  <PartyPhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
-                )}
-
-                {/* Wedding Celebration Theme Embellishments: rings, bouquets, candles, leaves, hearts, sparkles */}
-                {isWeddingTheme && (
-                  <WeddingPhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
-                )}
-
-                {/* Birthday Celebration Theme Embellishments: 12 elements (cake, balloons, gift, popper, party face, sparkles, confetti, candles, cupcake, star, ribbon, glasses) */}
-                {isBirthdayTheme && (
-                  <BirthdayPhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
-                )}
-
-                {/* Corporate Theme Embellishments: 12 elements (briefcase, handshake, bar chart, target, trophy, lightbulb, team, growth arrow, building, achievement, microphone, sparkles) */}
-                {isCorporateTheme && (
-                  <CorporatePhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
-                )}
-
-                {/* Graduation Celebration Embellishments: 12 elements (cap, trophy, diploma, medal, stars, sparkles, books, confetti, badge, tassel, pen, celebration) */}
-                {isGraduationTheme && (
-                  <GraduationPhotoAccents photoIndex={pIdx} totalPhotos={photoSlots.length} />
-                )}
-              </div>
-            </React.Fragment>
-          ))}
+          {photoSlots.map((_, pIdx) => renderPhotoSlot(pIdx, false))}
         </div>
       )}
 
       {/* Caption if provided by user */}
-      {caption && caption.trim() && (
+      {caption && caption.trim() && !isMusicPlayer && !(isVintagePostcard && layoutId === 'diagonal_duo') && (
         <div className="w-full text-center px-2 pt-1 pb-0.5">
           <p className="text-[7.5px] font-mono tracking-wider italic truncate opacity-85">
             {caption.trim()}
@@ -4926,8 +5538,41 @@ export function MemoraBooth({
       )}
 
       {/* Bottom Footer Inscription */}
-      <div className="w-full pt-2 border-t text-center mt-1" style={{ borderColor: isSchoolTheme ? schoolPalette.borderGold : isPartyTheme ? 'rgba(236, 72, 153, 0.4)' : isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)' }}>
-        {isSchoolTheme ? (
+      <div
+        className="w-full pt-2 border-t text-center mt-1"
+        style={{
+          borderColor: (isCrimsonRomance || isMusicPlayer || isGinghamStrawberry || isKpopCandyStripes || isVintagePostcard)
+            ? 'transparent'
+            : isSchoolTheme
+            ? schoolPalette.borderGold
+            : isPartyTheme
+            ? 'rgba(236, 72, 153, 0.4)'
+            : isLight
+            ? 'rgba(0,0,0,0.1)'
+            : 'rgba(255,255,255,0.1)',
+        }}
+      >
+        {isCrimsonRomance ? (
+          <CrimsonRomanceFooter />
+        ) : isVintagePostcard ? (
+          layoutId === 'diagonal_duo' ? (
+            <div className="w-full pt-1 flex items-center justify-between text-[6px] font-mono tracking-widest text-[#8c735d] uppercase">
+              <span>EST. 2026</span>
+              <span className="font-serif font-bold text-[#2c1e14] text-[7.5px]">NXMEMORA</span>
+              <span>ORIGINAL PRINT</span>
+            </div>
+          ) : (
+            <VintagePostcardFooter />
+          )
+        ) : isMusicPlayer ? (
+          <div className="w-full pt-0.5">
+            <MusicPlayerWidget title={caption && caption.trim() ? caption.trim() : undefined} />
+          </div>
+        ) : isGinghamStrawberry ? (
+          <GinghamStrawberryFooter />
+        ) : isKpopCandyStripes ? (
+          <HaruCandyStripesFooter />
+        ) : isSchoolTheme ? (
           <>
             <div className="py-0.5 flex items-center justify-center">
               <SchoolAcademicFooterIcon width={120} height={18} isLight={isSchoolLight} />
@@ -4935,7 +5580,7 @@ export function MemoraBooth({
             <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: schoolPalette.textSecondary }}>
               <Logo className="w-2.5 h-2.5 shrink-0" />
               <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
-                MEMORA
+                NXMEMORA
               </span>
             </div>
           </>
@@ -4947,7 +5592,7 @@ export function MemoraBooth({
             <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#0284c7' }}>
               <Logo className="w-2.5 h-2.5 shrink-0" />
               <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
-                MEMORA
+                NXMEMORA
               </span>
             </div>
           </>
@@ -4959,7 +5604,7 @@ export function MemoraBooth({
             <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#ec4899' }}>
               <Logo className="w-2.5 h-2.5 shrink-0" />
               <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
-                MEMORA
+                NXMEMORA
               </span>
             </div>
           </>
@@ -4971,7 +5616,7 @@ export function MemoraBooth({
             <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#b8860b' }}>
               <Logo className="w-2.5 h-2.5 shrink-0" />
               <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
-                MEMORA
+                NXMEMORA
               </span>
             </div>
           </>
@@ -4983,7 +5628,7 @@ export function MemoraBooth({
             <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#d97706' }}>
               <Logo className="w-2.5 h-2.5 shrink-0" />
               <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
-                MEMORA
+                NXMEMORA
               </span>
             </div>
           </>
@@ -4995,7 +5640,7 @@ export function MemoraBooth({
             <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#2563eb' }}>
               <Logo className="w-2.5 h-2.5 shrink-0" />
               <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
-                MEMORA
+                NXMEMORA
               </span>
             </div>
           </>
@@ -5007,7 +5652,7 @@ export function MemoraBooth({
             <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#d4af37' }}>
               <Logo className="w-2.5 h-2.5 shrink-0" />
               <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
-                MEMORA
+                NXMEMORA
               </span>
             </div>
           </>
@@ -5019,7 +5664,7 @@ export function MemoraBooth({
             <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: '#db2777' }}>
               <Logo className="w-2.5 h-2.5 shrink-0" />
               <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
-                MEMORA
+                NXMEMORA
               </span>
             </div>
           </>
@@ -5034,7 +5679,7 @@ export function MemoraBooth({
             <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none" style={{ color: selectedTemplate.textColor }}>
               <Logo className="w-2.5 h-2.5 shrink-0" />
               <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
-                MEMORA
+                NXMEMORA
               </span>
             </div>
           </>
@@ -5050,7 +5695,13 @@ export function MemoraBooth({
     <div className="min-h-screen bg-foreground text-cream font-sans">
       <div
         className={`mx-auto flex min-h-screen w-full flex-col px-4 py-4 transition-all duration-300 ${
-          phase === 'intro' ? 'max-w-5xl' : phase === 'shooting' ? 'max-w-[460px] sm:max-w-[500px]' : 'max-w-[420px]'
+          phase === 'intro'
+            ? 'max-w-5xl'
+            : phase === 'shooting'
+            ? 'max-w-[460px] sm:max-w-[500px]'
+            : phase === 'printing'
+            ? 'max-w-[460px] sm:max-w-[500px]'
+            : 'max-w-[420px]'
         }`}
       >
         {/* Header */}
@@ -5109,10 +5760,7 @@ export function MemoraBooth({
                         }`}
                         title={activeProTemplate.name}
                       >
-                        <span
-                          className="w-3.5 h-3.5 rounded-full shrink-0 border border-white/20 shadow-xs"
-                          style={{ backgroundColor: activeProTemplate.frameColor }}
-                        />
+                        {renderTemplateIcon(activeProTemplate)}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-xs truncate leading-snug">{activeProTemplate.name}</span>
@@ -5142,10 +5790,7 @@ export function MemoraBooth({
                                 }`}
                                 title={tpl.name}
                               >
-                                <span
-                                  className="w-3.5 h-3.5 rounded-full shrink-0 border border-white/20 shadow-xs"
-                                  style={{ backgroundColor: tpl.frameColor }}
-                                />
+                                {renderTemplateIcon(tpl)}
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-1.5">
                                     <span className="font-medium text-xs truncate leading-snug">{tpl.name}</span>
@@ -5207,10 +5852,7 @@ export function MemoraBooth({
                           }`}
                           title={tpl.name}
                         >
-                          <span
-                            className="w-3.5 h-3.5 rounded-full shrink-0 border border-white/20 shadow-xs"
-                            style={{ backgroundColor: tpl.frameColor }}
-                          />
+                          {renderTemplateIcon(tpl)}
                           <div className="min-w-0 flex-1">
                             <div className="font-medium text-xs truncate leading-snug">{tpl.name}</div>
                             <div className="text-[10px] font-mono text-cream/45 truncate">
@@ -5290,10 +5932,10 @@ export function MemoraBooth({
               </div>
 
               {/* Right Column: Live Photo Strip Preview */}
-              <div className="lg:col-span-5 w-full flex flex-col items-center">
-                <div className="w-full rounded-3xl bg-cream/5 border border-white/10 p-5 sm:p-6 flex flex-col items-center backdrop-blur-xs shadow-xl">
+              <div className="lg:col-span-5 w-full flex flex-col items-center lg:sticky lg:top-4 self-start">
+                <div className="w-full rounded-3xl bg-cream/5 border border-white/10 p-4 sm:p-5 flex flex-col items-center backdrop-blur-xs shadow-xl max-h-[calc(100vh-3.5rem)]">
                   {/* Card Header */}
-                  <div className="w-full flex items-center justify-between pb-3 mb-3 border-b border-white/10 text-[11px] font-mono">
+                  <div className="w-full flex items-center justify-between pb-2.5 mb-2.5 border-b border-white/10 text-[11px] font-mono shrink-0">
                     <div className="flex items-center gap-2">
                       <span className="inline-block size-2 rounded-full bg-emerald-400 animate-pulse" />
                       <span className="uppercase tracking-widest text-cream/70 font-medium">
@@ -5306,13 +5948,13 @@ export function MemoraBooth({
                   </div>
 
                   {/* Summary Bar */}
-                  <div className="w-full flex items-center justify-between px-3 py-1.5 rounded-xl bg-black/30 border border-white/5 text-[10px] font-mono text-cream/60 mb-3">
+                  <div className="w-full flex items-center justify-between px-3 py-1.5 rounded-xl bg-black/30 border border-white/5 text-[10px] font-mono text-cream/60 mb-2.5 shrink-0">
                     <span className="truncate">{selectedTemplate.name.replace(/^Pro Event\s*[–—-]\s*/i, isStudioPlan ? 'Studio Pro – ' : 'Pro Event – ')}</span>
                     <span className="text-primary font-medium shrink-0 ml-2">{activeLayout.label}</span>
                   </div>
 
                   {/* Photobooth Strip Canvas Container */}
-                  <div className="w-full flex justify-center py-1">
+                  <div className="w-full flex justify-center py-1 overflow-y-auto scrollbar-none flex-1">
                     {renderStripDesign()}
                   </div>
                 </div>
@@ -5333,6 +5975,14 @@ export function MemoraBooth({
                 autoPlay
                 className={`h-full w-full object-cover ${facing === 'user' ? '-scale-x-100' : ''}`}
                 style={{ filter: activeFilter.css }}
+              />
+
+              {/* Real-time AR Face Props Tracking Canvas */}
+              <canvas
+                ref={arCanvasRef}
+                className={`absolute inset-0 pointer-events-none h-full w-full object-cover z-10 ${
+                  facing === 'user' ? '-scale-x-100' : ''
+                }`}
               />
 
               {/* Viewfinder Top Controls: Ultra-Minimalist Glass Bar */}
@@ -5429,6 +6079,15 @@ export function MemoraBooth({
               )}
             </div>
 
+            {/* Live AR Virtual Props & Hats Selector */}
+            <div className="w-full mt-2.5">
+              <ARPropsSelector
+                activeProp={activeProp}
+                onSelectProp={setActiveProp}
+                isLoading={isARLoading}
+              />
+            </div>
+
             {/* Bottom Controls: Shooting Phase */}
             <div className="w-full pt-6 sm:pt-8">
               <div className="flex items-center justify-between px-2">
@@ -5468,9 +6127,26 @@ export function MemoraBooth({
           </div>
         )}
 
+        {/* Phase: Printer Animation */}
+        {phase === 'printing' && (
+          <BoothStripPrinter
+            stripElement={renderStripDesign(capturedShots)}
+            eventName={eventName}
+            isWideLayout={layoutId === 'diagonal_duo' || layoutId === 'grid2x2' || layoutId === 'grid2x3'}
+            onComplete={() => setPhase('editing')}
+            onSkip={() => setPhase('editing')}
+            onRetake={() => {
+              setPhase('shooting');
+              setCapturedShots([]);
+              setRenderedStripUrl(null);
+              setRenderedGifUrl(null);
+            }}
+          />
+        )}
+
         {/* Phase 3: Editing */}
         {phase === 'editing' && (
-          <div className="flex-1 flex flex-col justify-between w-full">
+          <div className="animate-rise flex-1 flex flex-col justify-between w-full">
             {/* Format switcher pill when GIF is enabled in editing phase - placed cleanly above preview so it never covers the header */}
             {isGifAllowed && (
               <div className="flex items-center justify-center mb-3 z-30 select-none">
@@ -5547,30 +6223,6 @@ export function MemoraBooth({
                 ))}
               </div>
 
-              {/* Frame Swatches and Caption Input */}
-              <div className="flex items-center gap-2">
-                {FRAMES.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setFrameId(item.id)}
-                    aria-label={`${item.label} frame`}
-                    style={{ backgroundColor: item.paper }}
-                    className={`size-9 rounded-lg transition-all cursor-pointer ${
-                      frameId === item.id ? 'ring-2 ring-cream scale-105' : 'ring-1 ring-cream/30 hover:ring-cream/60'
-                    }`}
-                  />
-                ))}
-                <input
-                  type="text"
-                  value={caption}
-                  onChange={(e) => setCaption(e.target.value)}
-                  maxLength={44}
-                  placeholder="Add a caption"
-                  className="ml-2 min-w-0 flex-1 rounded-full bg-cream/10 px-4 py-2.5 text-sm text-cream placeholder:text-cream/40 focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-
               {renderError && <p className="text-sm text-destructive">{renderError}</p>}
 
               {/* Action Buttons: Retake, Download PNG, Download GIF */}
@@ -5622,7 +6274,17 @@ export function MemoraBooth({
                       <Sparkles className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  <div className="flex justify-center">
+                  <div className="flex items-center justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPhase('printing')}
+                      className="inline-flex items-center gap-1.5 font-mono text-[11px] text-cream/60 hover:text-cream transition-colors cursor-pointer py-1"
+                      title="Watch the strip printer animation again"
+                    >
+                      <Printer className="w-3 h-3" />
+                      <span>Replay print</span>
+                    </button>
+                    <span className="text-white/20">•</span>
                     <button
                       type="button"
                       onClick={() => {
@@ -5639,7 +6301,16 @@ export function MemoraBooth({
                   </div>
                 </div>
               ) : (
-                <div className="flex gap-3">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPhase('printing')}
+                    className="rounded-full border border-cream/20 px-4 py-3.5 text-xs font-mono uppercase tracking-wider text-cream/70 hover:text-cream hover:bg-cream/10 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                    title="Watch the strip printer animation again"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>Replay</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => {

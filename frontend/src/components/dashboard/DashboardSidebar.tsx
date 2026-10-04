@@ -29,6 +29,7 @@ import { getScopedEvents } from '@/lib/userEvents';
 import { formatFirstName, cn } from '@/lib/utils';
 import { apiClient } from '@/lib/api';
 import { useRealtime } from '@/context/RealtimeContext';
+import { useModal } from '@/context/ModalContext';
 
 interface DashboardSidebarProps {
   onCloseMobile?: () => void;
@@ -51,6 +52,7 @@ interface NavGroup {
 export function DashboardSidebar({ onCloseMobile }: DashboardSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { confirm: confirmModal } = useModal();
   const [userName, setUserName] = useState('Studio Organizer');
   const [userEmail, setUserEmail] = useState('');
   const [userRole, setUserRole] = useState<UserRole>('client');
@@ -181,12 +183,24 @@ export function DashboardSidebar({ onCloseMobile }: DashboardSidebarProps) {
     };
   }, []);
 
-  const handleLogout = () => {
-    try {
-      localStorage.removeItem('memora_token');
-      localStorage.removeItem('memora_user');
-    } catch {}
-    router.push('/login');
+  const handleLogout = async () => {
+    const confirmed = await confirmModal({
+      title: 'Sign out of Memora?',
+      description: 'Are you sure you want to end your current session? You will need to sign in again to access your workspace and events.',
+      confirmText: 'Sign Out',
+      cancelText: 'Stay Signed In',
+      variant: 'logout',
+      eyebrow: 'ACCOUNT SESSION',
+    });
+
+    if (confirmed) {
+      try {
+        await apiClient.post('/auth/logout').catch(() => {});
+        localStorage.removeItem('memora_token');
+        localStorage.removeItem('memora_user');
+      } catch {}
+      router.push('/login');
+    }
   };
 
   const navGroups: NavGroup[] = [
@@ -323,7 +337,7 @@ export function DashboardSidebar({ onCloseMobile }: DashboardSidebarProps) {
           <div>
             <div className="flex items-center gap-2">
               <span className="font-display text-2xl tracking-[0.1em] font-normal text-foreground group-hover:text-primary transition-colors">
-                MEMORA
+                NXMEMORA
               </span>
               {isAdminRole(userRole) && (
                 <span className="px-2 py-0.5 rounded-full text-[9px] font-mono uppercase tracking-wider bg-primary/10 text-primary border border-primary/20 font-medium">

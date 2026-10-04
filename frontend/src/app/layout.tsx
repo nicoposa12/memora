@@ -2,10 +2,10 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Memora — the photobooth that lives in your guests' phones",
+  title: "NxMemora — the photobooth that lives in your guests' phones",
   description: "Scan, snap, download. A browser photobooth for weddings, parties and brand events.",
-  keywords: ["photobooth", "web photobooth", "event photobooth", "browser photobooth", "wedding photobooth", "qr code photobooth", "memora"],
-  authors: [{ name: "Memora" }],
+  keywords: ["photobooth", "web photobooth", "event photobooth", "browser photobooth", "wedding photobooth", "qr code photobooth", "nxmemora", "memora"],
+  authors: [{ name: "NxMemora" }],
   icons: {
     icon: [
       { url: '/favicon.ico' },
@@ -19,16 +19,16 @@ export const metadata: Metadata = {
   },
   manifest: '/site.webmanifest',
   appleWebApp: {
-    title: 'Memora',
+    title: 'NxMemora',
   },
   openGraph: {
-    title: "Memora — the photobooth that lives in your guests' phones",
+    title: "NxMemora — the photobooth that lives in your guests' phones",
     description: "Scan, snap, download. A browser photobooth for weddings, parties and brand events.",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Memora — the photobooth that lives in your guests' phones",
+    title: "NxMemora — the photobooth that lives in your guests' phones",
     description: "Scan, snap, download. A browser photobooth for weddings, parties and brand events.",
   },
 };

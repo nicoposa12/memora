@@ -36,7 +36,7 @@ export default function HomePage() {
           >
             <Logo className="w-8 h-8 transition-transform duration-300 group-hover:scale-105" />
             <span className="font-display text-2xl tracking-[0.12em] font-normal text-foreground group-hover:text-primary transition-colors">
-              MEMORA
+              NXMEMORA
             </span>
           </Link>
           <nav className="flex items-center gap-3">
@@ -440,7 +440,7 @@ export default function HomePage() {
           >
             <Logo className="w-6 h-6 transition-transform duration-300 group-hover:scale-105" />
             <span className="font-display text-xl tracking-[0.12em] font-normal text-foreground group-hover:text-primary transition-colors">
-              MEMORA
+              NXMEMORA
             </span>
           </Link>
           <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground">

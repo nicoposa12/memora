@@ -152,7 +152,7 @@ export function PhotoEditor({
   const [selectedBorderOrnament, setSelectedBorderOrnament] = useState<BorderOrnament>(effectiveIsPremium ? 'double_gold' : 'hairline');
   const [selectedInsignia, setSelectedInsignia] = useState<InsigniaType>(effectiveIsPremium ? 'crest' : 'none');
   const [selectedFontFamily, setSelectedFontFamily] = useState<FontFamilyOption>('editorial');
-  const [selectedPresetId, setSelectedPresetId] = useState<string>(effectiveIsPremium ? 'ritz_gala' : 'editorial_white');
+  const [selectedPresetId, setSelectedPresetId] = useState<string>('classic_filmstrip');
 
   const [activeTab, setActiveTab] = useState<'templates' | 'layouts' | 'filters' | 'stickers'>('templates');
   const [addedStickers, setAddedStickers] = useState<{ id: string; emoji: string; x: number; y: number }[]>([]);

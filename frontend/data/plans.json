@@ -7,27 +7,20 @@
     "price": 0,
     "priceDisplay": "₱0",
     "period": "single event",
-    "summary": "All 13 studio templates & 7 strip layouts included for booth testing & private events",
+    "summary": "35mm Noir Filmstrip & 7 strip layouts included for booth testing & private events",
     "watermark": true,
     "maxPhotos": 50,
-    "templatesUnlocked": "All 13 Studio Templates Included",
+    "templatesUnlocked": "35mm Noir Filmstrip Included",
     "filtersUnlocked": "3 Classic Filters",
     "downloads": "Downloads & digital gallery",
     "eventCoverage": "1 Single Event",
     "allowedTemplateIds": [
       "classic_filmstrip",
-      "vogue_met",
-      "ritz_gala",
-      "amalfi_wedding",
-      "marais_darkroom",
-      "versailles_baroque",
-      "soho_loft",
-      "rose_romance",
-      "monaco_grandprix",
-      "kyoto_wabi",
-      "hamptons_linen",
-      "ivy_collegiate",
-      "yearbook_alumni"
+      "crimson_romance",
+      "music_player",
+      "gingham_strawberry",
+      "kpop_candy_stripes",
+      "vintage_postcard"
     ],
     "allowedLayoutIds": [
       "strip4",
@@ -36,7 +29,8 @@
       "grid2x3",
       "filmstrip",
       "polaroid",
-      "duo"
+      "duo",
+      "diagonal_duo"
     ],
     "allowedEventTypes": [
       "other"
@@ -55,7 +49,7 @@
       },
       {
         "id": "f_tpl",
-        "text": "All 13 studio templates included",
+        "text": "35mm Noir Filmstrip included",
         "included": true
       },
       {
@@ -91,31 +85,25 @@
     "summary": "Full event pass with exclusive PRO event templates, zero watermark, and 1-month active access",
     "watermark": false,
     "maxPhotos": -1,
-    "templatesUnlocked": "All Templates & Layouts Unlocked",
+    "templatesUnlocked": "All Templates Included",
     "filtersUnlocked": "Premium Filters & Frames",
     "downloads": "Event gallery & HD downloads",
     "eventCoverage": "Full coverage for School, Beach, Party, Wedding, Birthday, Graduation & Corporate",
     "allowedTemplateIds": [
-      "classic_filmstrip",
-      "vogue_met",
-      "ritz_gala",
-      "amalfi_wedding",
-      "marais_darkroom",
-      "versailles_baroque",
-      "soho_loft",
-      "rose_romance",
-      "monaco_grandprix",
-      "kyoto_wabi",
-      "hamptons_linen",
-      "ivy_collegiate",
-      "yearbook_alumni",
       "event_party",
       "event_wedding",
       "event_birthday",
       "event_school",
       "event_beach",
       "event_corporate",
-      "event_graduation"
+      "event_graduation",
+      "event_debut",
+      "music_player",
+      "gingham_strawberry",
+      "kpop_candy_stripes",
+      "classic_filmstrip",
+      "crimson_romance",
+      "vintage_postcard"
     ],
     "allowedLayoutIds": [
       "strip4",
@@ -124,7 +112,8 @@
       "grid2x3",
       "filmstrip",
       "polaroid",
-      "duo"
+      "duo",
+      "diagonal_duo"
     ],
     "allowedEventTypes": [
       "school",
@@ -157,7 +146,7 @@
       },
       {
         "id": "p2",
-        "text": "All 7 strip layouts & 13 studio templates included",
+        "text": "All 7 strip layouts & 35mm Noir Filmstrip included",
         "included": true,
         "highlight": true
       },
@@ -196,31 +185,25 @@
     "summary": "Complete platform access for photobooth businesses & event planners",
     "watermark": false,
     "maxPhotos": -1,
-    "templatesUnlocked": "All Templates & Layouts Unlocked",
+    "templatesUnlocked": "All Templates Included",
     "filtersUnlocked": "All Filters & Custom Themes",
     "downloads": "Full High-Resolution Archive & Bulk ZIP",
     "eventCoverage": "Unlimited events across School, Beach, Party, Wedding, Birthday, Graduation & Corporate",
     "allowedTemplateIds": [
-      "classic_filmstrip",
-      "vogue_met",
-      "ritz_gala",
-      "amalfi_wedding",
-      "marais_darkroom",
-      "versailles_baroque",
-      "soho_loft",
-      "rose_romance",
-      "monaco_grandprix",
-      "kyoto_wabi",
-      "hamptons_linen",
-      "ivy_collegiate",
-      "yearbook_alumni",
       "event_party",
       "event_wedding",
       "event_birthday",
       "event_school",
       "event_beach",
       "event_corporate",
-      "event_graduation"
+      "event_graduation",
+      "event_debut",
+      "classic_filmstrip",
+      "kpop_candy_stripes",
+      "gingham_strawberry",
+      "music_player",
+      "crimson_romance",
+      "vintage_postcard"
     ],
     "allowedLayoutIds": [
       "strip4",
@@ -229,7 +212,8 @@
       "grid2x3",
       "filmstrip",
       "polaroid",
-      "duo"
+      "duo",
+      "diagonal_duo"
     ],
     "allowedEventTypes": [
       "school",
@@ -256,7 +240,7 @@
       },
       {
         "id": "s2",
-        "text": "All PRO event templates & 13 studio templates",
+        "text": "All PRO event templates & 35mm Noir Filmstrip",
         "included": true,
         "highlight": true
       },

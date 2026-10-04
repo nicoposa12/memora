@@ -18,6 +18,8 @@ import {
   CreditCard,
 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
+import { useModal } from '@/context/ModalContext';
+import { apiClient } from '@/lib/api';
 
 interface AdminSidebarProps {
   onCloseMobile?: () => void;
@@ -26,6 +28,7 @@ interface AdminSidebarProps {
 export function AdminSidebar({ onCloseMobile }: AdminSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { confirm: confirmModal } = useModal();
 
   const [adminName, setAdminName] = useState('Chief Administrator');
   const [adminEmail, setAdminEmail] = useState('');
@@ -59,6 +62,26 @@ export function AdminSidebar({ onCloseMobile }: AdminSidebarProps) {
       setMrrAmount(proCount * 4999);
     } catch {}
   }, []);
+
+  const handleLogout = async () => {
+    const confirmed = await confirmModal({
+      title: 'Sign out of Memora?',
+      description: 'Are you sure you want to end your administrator session? You will need to sign in again to access the control panel.',
+      confirmText: 'Sign Out',
+      cancelText: 'Stay Signed In',
+      variant: 'logout',
+      eyebrow: 'ADMIN SESSION',
+    });
+
+    if (confirmed) {
+      try {
+        await apiClient.post('/auth/logout').catch(() => {});
+        localStorage.removeItem('memora_token');
+        localStorage.removeItem('memora_user');
+      } catch {}
+      router.push('/login');
+    }
+  };
 
   const adminNav = [
     {
@@ -142,7 +165,7 @@ export function AdminSidebar({ onCloseMobile }: AdminSidebarProps) {
           <Link href="/" className="flex items-center gap-2.5 group cursor-pointer" title="Return to homepage">
             <Logo className="w-6 h-6 text-primary transition-transform group-hover:scale-105" />
             <span className="font-display text-2xl font-medium tracking-tight text-foreground group-hover:text-primary transition-colors">
-              Memora
+              NxMemora
             </span>
           </Link>
         </div>
@@ -231,11 +254,7 @@ export function AdminSidebar({ onCloseMobile }: AdminSidebarProps) {
           </div>
 
           <button
-            onClick={() => {
-              localStorage.removeItem('memora_token');
-              localStorage.removeItem('memora_user');
-              router.push('/login');
-            }}
+            onClick={handleLogout}
             className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
             title="Sign out"
           >

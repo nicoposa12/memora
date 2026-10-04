@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  transpilePackages: ['@mediapipe/tasks-vision'],
   turbopack: {},
   webpack: (config, { dev }) => {
     if (dev) {

@@ -1,14 +1,14 @@
 'use client';
 
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
-import { Trash2, AlertTriangle, Info, CheckCircle2, X } from 'lucide-react';
+import { Trash2, AlertTriangle, Info, CheckCircle2, X, LogOut } from 'lucide-react';
 
 export interface ConfirmModalOptions {
   title?: string;
   description?: string;
   confirmText?: string;
   cancelText?: string;
-  variant?: 'danger' | 'warning' | 'info' | 'success';
+  variant?: 'danger' | 'warning' | 'info' | 'success' | 'logout';
   eyebrow?: string;
 }
 
@@ -149,7 +149,7 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
             {/* Header: Icon + Eyebrow */}
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border ${
-                variant === 'danger'
+                variant === 'danger' || variant === 'logout'
                   ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
                   : variant === 'warning'
                   ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
@@ -157,6 +157,7 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
                   ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
                   : 'bg-primary/10 text-primary border-primary/20'
               }`}>
+                {variant === 'logout' && <LogOut className="w-4 h-4" />}
                 {variant === 'danger' && <Trash2 className="w-4 h-4" />}
                 {variant === 'warning' && <AlertTriangle className="w-4 h-4" />}
                 {variant === 'success' && <CheckCircle2 className="w-4 h-4" />}
@@ -165,7 +166,7 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
 
               <div>
                 <span className={`font-mono text-[10px] uppercase tracking-[0.22em] font-semibold block ${
-                  variant === 'danger'
+                  variant === 'danger' || variant === 'logout'
                     ? 'text-rose-600 dark:text-rose-400'
                     : variant === 'warning'
                     ? 'text-amber-600 dark:text-amber-400'
@@ -205,7 +206,7 @@ export function ModalProvider({ children }: { children: React.ReactNode }) {
                 onClick={handleConfirm}
                 autoFocus
                 className={`px-6 py-2.5 rounded-full text-xs font-mono uppercase tracking-[0.14em] font-semibold transition-all shadow-xs cursor-pointer ${
-                  variant === 'danger'
+                  variant === 'danger' || variant === 'logout'
                     ? 'bg-rose-600 hover:bg-rose-700 text-white active:scale-[0.98]'
                     : variant === 'warning'
                     ? 'bg-amber-600 hover:bg-amber-700 text-white active:scale-[0.98]'

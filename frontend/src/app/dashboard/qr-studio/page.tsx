@@ -368,7 +368,7 @@ export default function QrStudioPage() {
             <div className="flex items-center gap-2 mb-6">
               <Logo className={`w-5 h-5 ${currentTheme.accent}`} />
               <span className="font-editorial-italic text-2xl tracking-wide">
-                Memora
+                NxMemora
               </span>
             </div>
 

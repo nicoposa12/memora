@@ -121,7 +121,7 @@ function StudioCheckoutContent() {
           <Link href="/" className="flex items-center gap-3 group cursor-pointer">
             <Logo className="w-7 h-7 transition-transform group-hover:scale-105" />
             <span className="font-display text-xl tracking-[0.14em] font-light text-foreground">
-              MEMORA
+              NXMEMORA
             </span>
           </Link>
 

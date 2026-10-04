@@ -794,7 +794,7 @@ export function EventTypeSelectWithPreview({
                   <div className="flex items-center justify-center gap-1 opacity-75 mt-0.5 select-none">
                     <Logo className="w-2.5 h-2.5 shrink-0" />
                     <span className="font-display font-medium text-[7.5px] tracking-[0.2em] leading-none uppercase">
-                      MEMORA
+                      NXMEMORA
                     </span>
                   </div>
                 </div>

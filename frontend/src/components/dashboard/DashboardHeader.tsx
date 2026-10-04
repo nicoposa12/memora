@@ -107,7 +107,7 @@ export function DashboardHeader({ onOpenMobileMenu }: DashboardHeaderProps) {
         {/* Mobile Brand indicator */}
         <Link href="/" className="flex lg:hidden items-center gap-2 cursor-pointer hover:opacity-90 transition-opacity" title="Return to homepage">
           <Logo className="w-5 h-5 text-primary" />
-          <span className="font-display text-xl text-foreground">Memora</span>
+          <span className="font-display text-xl text-foreground">NxMemora</span>
         </Link>
 
         {/* Desktop Dynamic Breadcrumbs */}

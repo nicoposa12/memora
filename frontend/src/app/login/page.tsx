@@ -139,7 +139,7 @@ function AuthForm() {
           <Link href="/" className="inline-flex items-center gap-3 mb-4 group cursor-pointer" title="Return to homepage">
             <Logo className="w-10 h-10 transition-transform duration-300 group-hover:scale-105 shadow-sm" />
             <span className="font-display text-2xl tracking-[0.12em] font-normal text-foreground group-hover:text-primary transition-colors">
-              MEMORA
+              NXMEMORA
             </span>
           </Link>
           <h1 className="font-display text-3xl sm:text-4xl font-light tracking-[-0.01em] text-foreground">
